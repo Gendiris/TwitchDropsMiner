@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 from translate import _
 from exceptions import CaptchaRequired
 from constants import State
+from state_store import StateStore
 
 if TYPE_CHECKING:
     from channel import Channel
@@ -30,6 +31,7 @@ class MinerService:
 
     def __init__(self, settings: Settings):
         self.settings: Settings = settings
+        self._state_store = StateStore(settings)
         self._twitch: Twitch | None = None
         self._task: asyncio.Task[int] | None = None
         self._requested_channel: int | str | None = None
@@ -49,7 +51,11 @@ class MinerService:
         if self._twitch is None:
             from twitch import Twitch
 
-            self._twitch = Twitch(self.settings, service=self)
+            self._twitch = Twitch(
+                self.settings,
+                service=self,
+                state_store=self._state_store,
+            )
         return self._twitch
 
     async def start(self) -> int:
@@ -89,6 +95,7 @@ class MinerService:
         - None to let the selector logic decide
         """
         self._requested_channel = channel_ref
+        self._state_store.set_pending_switch(channel_ref)
         self._ensure_twitch().change_state(State.CHANNEL_SWITCH)
 
     def consume_switch_request(self) -> Channel | None:
@@ -99,6 +106,7 @@ class MinerService:
             return None
         request = self._requested_channel
         self._requested_channel = None
+        self._state_store.set_pending_switch(None)
         channels = twitch.channels
         if isinstance(request, int):
             return channels.get(request)
@@ -109,16 +117,8 @@ class MinerService:
         return None
 
     def get_snapshot(self) -> dict[str, Any]:
-        twitch = self._twitch
-        watching = None
-        if twitch is not None:
-            watching_channel = twitch.watching_channel.get_with_default(None)
-            watching = watching_channel and watching_channel.name
-        return {
-            "state": twitch._state.name if twitch is not None else State.EXIT.name,
-            "watching": watching,
-            "pending_switch": self._requested_channel,
-        }
+        self._state_store.update_settings(self.settings)
+        return self._state_store.get_snapshot()
 
     async def _run(self, client: Twitch) -> int:
         self._exit_status = 0
@@ -130,10 +130,12 @@ class MinerService:
             await client.run()
         except CaptchaRequired:
             self._exit_status = 1
+            self._state_store.record_error("Captcha required")
             client.prevent_close()
             client.print(_("error", "captcha"))
         except Exception:
             self._exit_status = 1
+            self._state_store.record_error("Fatal error encountered")
             client.prevent_close()
             client.print("Fatal error encountered:\n")
             client.print(traceback.format_exc())
