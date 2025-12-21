@@ -47,6 +47,26 @@ class MinerService:
             return None
         return self._twitch.gui
 
+    @property
+    def is_running(self) -> bool:
+        return self._task is not None and not self._task.done()
+
+    @property
+    def state_store(self) -> StateStore:
+        return self._state_store
+
+    def ensure_started(self) -> bool:
+        """
+        Start the miner loop if it is not already running.
+
+        Returns True if a new task was created.
+        """
+        if self._task is None or self._task.done():
+            twitch = self._ensure_twitch()
+            self._task = asyncio.create_task(self._run(twitch))
+            return True
+        return False
+
     def _ensure_twitch(self) -> Twitch:
         if self._twitch is None:
             from twitch import Twitch
@@ -62,9 +82,8 @@ class MinerService:
         """
         Start the miner lifecycle and return the resulting exit status.
         """
-        if self._task is None or self._task.done():
-            twitch = self._ensure_twitch()
-            self._task = asyncio.create_task(self._run(twitch))
+        self.ensure_started()
+        assert self._task is not None
         return await self._task
 
     async def stop(self) -> None:

@@ -94,7 +94,7 @@ if __name__ == "__main__":
         parser.add_argument(
             "--bind",
             type=str,
-            help="Host:port binding for future web UI (no effect yet)",
+            help="Host:port binding for the JSON web API",
         )
         # undocumented debug args
         parser.add_argument(
@@ -203,7 +203,17 @@ if __name__ == "__main__":
         logging.getLogger("TwitchDrops.websocket").setLevel(settings.debug_ws)
 
         service = MinerService(settings)
-        exit_status = await service.start()
+        api = None
+        if settings.bind:
+            from web_api import build_api
+
+            api = build_api(service)
+            await api.start(settings.bind)
+        try:
+            exit_status = await service.start()
+        finally:
+            if api is not None:
+                await api.stop()
         sys.exit(exit_status)
 
     try:

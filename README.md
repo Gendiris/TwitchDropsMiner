@@ -26,6 +26,21 @@ Every several seconds, the application pretends to watch a particular stream by 
 - Make sure to link your Twitch account to game accounts on the [campaigns page](https://www.twitch.tv/drops/campaigns), to enable more games to be mined.
 - When running without an existing `cookies.jar`, the miner exits with `AUTH_MISSING_COOKIES` in the snapshot; copy a cookies file from a logged-in installation to start without using the login UI.
 
+### Web API:
+
+- Run headless with `--bind <host:port>` (for example: `python main.py --headless --bind 0.0.0.0:8080`) to expose a JSON-only API that works alongside the miner.
+- Secure the API with a bearer token by setting `API_TOKEN`, or use basic authentication with `API_BASIC_USER` and `API_BASIC_PASSWORD`.
+- Available endpoints:
+  - `GET /api/health`
+  - `GET /api/snapshot`
+  - `GET /api/settings`
+  - `PUT /api/settings`
+  - `POST /api/actions/reload`
+  - `POST /api/actions/start`
+  - `POST /api/actions/stop`
+  - `POST /api/actions/switch-channel`
+- Example: `curl -H "Authorization: Bearer $API_TOKEN" http://localhost:8080/api/snapshot`
+
 ### Pictures:
 
 ![Main](https://user-images.githubusercontent.com/4180725/164298155-c0880ad7-6423-4419-8d73-f3c053730a1b.png)
