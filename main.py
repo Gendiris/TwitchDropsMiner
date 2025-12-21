@@ -59,7 +59,11 @@ if __name__ == "__main__":
         # TODO: replace int with union of literal values once typeshed updates
         @property
         def logging_level(self) -> int:
-            return LOGGING_LEVELS[min(self._verbose, 4)]
+            logging_level = LOGGING_LEVELS[min(self._verbose, 4)]
+            if self.headless and self._verbose == 0:
+                # Default to a more verbose level in headless mode to avoid silent exits.
+                return logging.INFO
+            return logging_level
 
         @property
         def debug_ws(self) -> int:
