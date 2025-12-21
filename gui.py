@@ -53,6 +53,7 @@ if TYPE_CHECKING:
     from channel import Channel
     from settings import Settings
     from inventory import DropsCampaign, TimedDrop
+    from miner_service import MinerService
 
 
 TK_PADDING = Union[int, Tuple[int, int], Tuple[int, int, int], Tuple[int, int, int, int]]
@@ -858,7 +859,7 @@ class ChannelList:
                 buttons_frame,
                 text=_("gui", "channels", "switch"),
                 state="disabled",
-                command=manager._twitch.state_change(State.CHANNEL_SWITCH),
+                command=lambda: manager.service.switch_channel(),
             ),
         }
         buttons_frame.grid(column=0, row=0, columnspan=2)
@@ -1168,7 +1169,7 @@ class TrayIcon:
         self, message: str, title: str | None = None, duration: float = 10
     ) -> asyncio.Task[None] | None:
         # do nothing if the user disabled notifications
-        if not self._manager._twitch.settings.tray_notifications:
+        if not self._manager.service.settings.tray_notifications:
             return None
         if self.icon is not None:
             icon = self.icon  # nonlocal scope bind
@@ -1224,7 +1225,7 @@ class InventoryOverview:
     def __init__(self, manager: GUIManager, master: ttk.Widget):
         self._manager = manager
         self._cache: ImageCache = manager._cache
-        self._settings: Settings = manager._twitch.settings
+        self._settings: Settings = manager.service.settings
         self._filters = {
             "not_linked": IntVar(
                 master, self._settings.priority_mode is PriorityMode.PRIORITY_ONLY
@@ -1575,7 +1576,7 @@ class SettingsPanel:
 
     def __init__(self, manager: GUIManager, master: ttk.Widget):
         self._manager = manager
-        self._settings: Settings = manager._twitch.settings
+        self._settings: Settings = manager.service.settings
         priority_mode = self._settings.priority_mode
         if priority_mode not in self.PRIORITY_MODES:
             priority_mode = PriorityMode.PRIORITY_ONLY
@@ -1809,7 +1810,7 @@ class SettingsPanel:
         ttk.Button(
             reload_frame,
             text=_("gui", "settings", "reload"),
-            command=self._manager._twitch.state_change(State.INVENTORY_FETCH),
+            command=self._manager.service.reload_state,
         ).grid(column=1, row=0)
 
         self._vars["autostart"].set(self._query_autostart())
@@ -2100,8 +2101,9 @@ class HelpTab:
 
 
 class GUIManager:
-    def __init__(self, twitch: Twitch):
+    def __init__(self, twitch: Twitch, *, service: MinerService | None = None):
         self._twitch: Twitch = twitch
+        self._service: MinerService | None = service or getattr(twitch, "_service", None)
         self._poll_task: asyncio.Task[NoReturn] | None = None
         self._close_requested = asyncio.Event()
         self._root = root = Tk(className=WINDOW_TITLE)
@@ -2234,9 +2236,9 @@ class GUIManager:
             self._orig_theme_name = self._style.theme_use()
         except Exception:
             self._orig_theme_name = ''
-        self.apply_theme(self._twitch.settings.dark_mode)
+        self.apply_theme(self.service.settings.dark_mode)
         # stay hidden in tray if needed, otherwise show the window when everything's ready
-        if self._twitch.settings.tray:
+        if self.service.settings.tray:
             # NOTE: this starts the tray icon thread
             self._root.after_idle(self.tray.minimize)
         else:
@@ -2279,6 +2281,11 @@ class GUIManager:
     @property
     def close_requested(self) -> bool:
         return self._close_requested.is_set()
+
+    @property
+    def service(self) -> MinerService:
+        assert self._service is not None
+        return self._service
 
     async def wait_until_closed(self):
         # wait until the user closes the window
@@ -2334,7 +2341,7 @@ class GUIManager:
         """
         self._close_requested.set()
         # notify client we're supposed to close
-        self._twitch.close()
+        self.service.request_stop()
         return 0
 
     def close_window(self):

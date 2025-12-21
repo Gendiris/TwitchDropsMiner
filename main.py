@@ -8,12 +8,10 @@ if __name__ == "__main__":
     freeze_support()
     import io
     import sys
-    import signal
     import asyncio
     import logging
     import argparse
     import warnings
-    import traceback
     import tkinter as tk
     from tkinter import messagebox
     from typing import NoReturn, TYPE_CHECKING
@@ -22,10 +20,9 @@ if __name__ == "__main__":
     truststore.inject_into_ssl()
 
     from translate import _
-    from twitch import Twitch
     from settings import Settings
     from version import __version__
-    from exceptions import CaptchaRequired
+    from miner_service import MinerService
     from utils import lock_file, resource_path, set_root_icon
     from constants import LOGGING_LEVELS, SELF_PATH, FILE_FORMATTER, LOG_PATH, LOCK_PATH
 
@@ -151,43 +148,8 @@ if __name__ == "__main__":
         logging.getLogger("TwitchDrops.gql").setLevel(settings.debug_gql)
         logging.getLogger("TwitchDrops.websocket").setLevel(settings.debug_ws)
 
-        exit_status = 0
-        client = Twitch(settings)
-        loop = asyncio.get_running_loop()
-        if sys.platform == "linux":
-            loop.add_signal_handler(signal.SIGINT, lambda *_: client.gui.close())
-            loop.add_signal_handler(signal.SIGTERM, lambda *_: client.gui.close())
-        try:
-            await client.run()
-        except CaptchaRequired:
-            exit_status = 1
-            client.prevent_close()
-            client.print(_("error", "captcha"))
-        except Exception:
-            exit_status = 1
-            client.prevent_close()
-            client.print("Fatal error encountered:\n")
-            client.print(traceback.format_exc())
-        finally:
-            if sys.platform == "linux":
-                loop.remove_signal_handler(signal.SIGINT)
-                loop.remove_signal_handler(signal.SIGTERM)
-            client.print(_("gui", "status", "exiting"))
-            await client.shutdown()
-        if not client.gui.close_requested:
-            # user didn't request the closure
-            client.gui.tray.change_icon("error")
-            client.print(_("status", "terminated"))
-            client.gui.status.update(_("gui", "status", "terminated"))
-            # notify the user about the closure
-            client.gui.grab_attention(sound=True)
-        await client.gui.wait_until_closed()
-        # save the application state
-        # NOTE: we have to do it after wait_until_closed,
-        # because the user can alter some settings between app termination and closing the window
-        client.save(force=True)
-        client.gui.stop()
-        client.gui.close_window()
+        service = MinerService(settings)
+        exit_status = await service.start()
         sys.exit(exit_status)
 
     try:

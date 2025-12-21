@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     from settings import Settings
     from inventory import TimedDrop
     from constants import ClientInfo, JsonType, GQLOperation
+    from miner_service import MinerService
 
 
 logger = logging.getLogger("TwitchDrops")
@@ -421,8 +422,9 @@ class _AuthState:
 
 
 class Twitch:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, *, service: "MinerService | None" = None):
         self.settings: Settings = settings
+        self._service: MinerService | None = service
         # State management
         self._state: State = State.IDLE
         self._state_change = asyncio.Event()
@@ -439,7 +441,7 @@ class Twitch:
         self._session: aiohttp.ClientSession | None = None
         self._auth_state: _AuthState = _AuthState(self)
         # GUI
-        self.gui = GUIManager(self)
+        self.gui = GUIManager(self, service=service)
         # Storing and watching channels
         self.channels: OrderedDict[int, Channel] = OrderedDict()
         self.watching_channel: AwaitableValue[Channel] = AwaitableValue()
@@ -835,7 +837,11 @@ class Twitch:
                 # Change into the selected channel, stay in the watching channel,
                 # or select a new channel that meets the required conditions
                 new_watching = None
-                selected_channel = self.gui.channels.get_selection()
+                selected_channel = None
+                if self._service is not None:
+                    selected_channel = self._service.consume_switch_request()
+                if selected_channel is None:
+                    selected_channel = self.gui.channels.get_selection()
                 if selected_channel is not None and self.can_watch(selected_channel):
                     # selected channel is checked first, and set as long as we can watch it
                     new_watching = selected_channel
