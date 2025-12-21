@@ -215,3 +215,7 @@ class HeadlessGUI:
 
     def display_drop(self, drop: TimedDrop, *, countdown: bool = True, subone: bool = False):
         logger.info(drop.rewards_text())
+
+    def clear_drop(self) -> None:
+        # In headless mode there's no UI to clear, but keep the API consistent
+        self.progress.display(None)
