@@ -111,7 +111,7 @@ if __name__ == "__main__":
     pre_parser.add_argument("--config", type=Path)
     pre_parser.add_argument("--data-dir", type=Path)
     pre_parser.add_argument("--bind", type=str)
-    pre_args, _ = pre_parser.parse_known_args()
+    pre_args, _remaining_args = pre_parser.parse_known_args()
 
     if pre_args.data_dir or pre_args.config:
         set_paths(working_dir=pre_args.data_dir, settings_path=pre_args.config)
