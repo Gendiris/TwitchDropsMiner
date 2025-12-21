@@ -8,7 +8,7 @@ import traceback
 from typing import TYPE_CHECKING, Any
 
 from translate import _
-from exceptions import CaptchaRequired
+from exceptions import AuthMissingCookies, CaptchaRequired
 from constants import State
 from state_store import StateStore
 
@@ -133,6 +133,11 @@ class MinerService:
             self._state_store.record_error("Captcha required")
             client.prevent_close()
             client.print(_("error", "captcha"))
+        except AuthMissingCookies:
+            self._exit_status = 1
+            self._state_store.record_error("AUTH_MISSING_COOKIES")
+            client.prevent_close()
+            client.print("Authentication cookies are missing. Please provide cookies.jar.")
         except Exception:
             self._exit_status = 1
             self._state_store.record_error("Fatal error encountered")

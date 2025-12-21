@@ -86,6 +86,14 @@ class CaptchaRequired(LoginException):
         super().__init__("Captcha is required")
 
 
+class AuthMissingCookies(LoginException):
+    """
+    Raised when authentication cookies are not present.
+    """
+    def __init__(self):
+        super().__init__("AUTH_MISSING_COOKIES")
+
+
 class GQLException(RequestException):
     """
     Raised when a GQL request returns an error response.
