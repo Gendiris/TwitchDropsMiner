@@ -62,6 +62,7 @@ if TYPE_CHECKING:
     from inventory import TimedDrop
     from constants import ClientInfo, JsonType, GQLOperation
     from miner_service import MinerService
+    from state_store import StateStore
 
 
 logger = logging.getLogger("TwitchDrops")
@@ -422,12 +423,21 @@ class _AuthState:
 
 
 class Twitch:
-    def __init__(self, settings: Settings, *, service: "MinerService | None" = None):
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        service: "MinerService | None" = None,
+        state_store: "StateStore | None" = None,
+    ):
         self.settings: Settings = settings
         self._service: MinerService | None = service
+        self.state_store: StateStore | None = state_store or getattr(service, "_state_store", None)
         # State management
         self._state: State = State.IDLE
         self._state_change = asyncio.Event()
+        if self.state_store is not None:
+            self.state_store.set_state(self._state)
         self.wanted_games: list[Game] = []
         self.inventory: list[DropsCampaign] = []
         self._drops: dict[str, TimedDrop] = {}
@@ -533,6 +543,8 @@ class Twitch:
         if self._state is not State.EXIT:
             # prevent state changing once we switch to exit state
             self._state = state
+        if self.state_store is not None:
+            self.state_store.set_state(self._state)
         self._state_change.set()
 
     def state_change(self, state: State) -> abc.Callable[[], None]:
@@ -791,6 +803,8 @@ class Twitch:
                 for channel in ordered_channels:
                     channels[channel.id] = channel
                     channel.display(add=True)
+                if self.state_store is not None:
+                    self.state_store.set_channels(channels.values())
                 # subscribe to these channel's state updates
                 to_add_topics: list[WebsocketTopic] = []
                 for channel_id in channels:
@@ -1033,6 +1047,8 @@ class Twitch:
         self.gui.tray.change_icon("active")
         self.gui.channels.set_watching(channel)
         self.watching_channel.set(channel)
+        if self.state_store is not None:
+            self.state_store.set_watching(channel)
         if update_status:
             status_text = _("status", "watching").format(channel=channel.name)
             self.print(status_text)
@@ -1042,6 +1058,8 @@ class Twitch:
         self.gui.clear_drop()
         self.watching_channel.clear()
         self.gui.channels.clear_watching()
+        if self.state_store is not None:
+            self.state_store.set_watching(None)
 
     def restart_watching(self):
         self.gui.progress.stop_timer()
@@ -1156,6 +1174,8 @@ class Twitch:
                     # ... and we can and should watch it
                     self.watch(channel)
         channel.display()
+        if self.state_store is not None:
+            self.state_store.set_channels(self.channels.values())
 
     @task_wrapper
     async def process_drops(self, user_id: int, message: JsonType):
@@ -1492,6 +1512,9 @@ class Twitch:
                 switch_triggers.update(campaign.time_triggers)
             self.inventory.append(campaign)
             self._campaigns[campaign.id] = campaign
+        if self.state_store is not None:
+            self.state_store.set_campaigns(self.inventory)
+            self.state_store.set_last_reload()
         # concurrently add the campaigns into the GUI
         # NOTE: this fetches pictures from the CDN, so might be slow without a cache
         status_update(
