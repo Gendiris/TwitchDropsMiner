@@ -102,7 +102,7 @@ class MinerService:
 
     def reload_state(self) -> None:
         twitch = self._ensure_twitch()
-        twitch.change_state(State.INVENTORY_FETCH)
+        twitch.request_inventory_refresh(force=True)
 
     def switch_channel(self, channel_ref: int | str | None = None) -> None:
         """
