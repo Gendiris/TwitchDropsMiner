@@ -3,12 +3,14 @@ from __future__ import annotations
 import base64
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 import aiohttp
 from aiohttp import web
 
 from constants import PriorityMode
+from utils import resource_path
 
 logger = logging.getLogger("TwitchDrops.api")
 
@@ -45,6 +47,8 @@ class WebAPI:
                 web.post("/api/actions/switch-channel", self._action_switch_channel),
             ]
         )
+        self._webui_path = resource_path("webui")
+        self._register_webui()
         self._runner: web.AppRunner | None = None
         self._site: web.TCPSite | None = None
         self._token = token
@@ -131,6 +135,19 @@ class WebAPI:
             return web.json_response({"error": "Channel must be int, str, or null"}, status=400)
         self._service.switch_channel(channel)
         return web.json_response({"status": "queued", "channel": channel})
+
+    def _register_webui(self) -> None:
+        webui_dir = Path(self._webui_path)
+        if not webui_dir.exists():
+            return
+        self._app.router.add_get("/", self._serve_index)
+        self._app.router.add_static("/webui", webui_dir)
+
+    async def _serve_index(self, _: web.Request) -> web.StreamResponse:
+        index_path = Path(self._webui_path, "index.html")
+        if not index_path.exists():
+            return web.Response(status=404, text="Web UI is not available.")
+        return web.FileResponse(index_path)
 
 
 def _extract_token(request: web.Request) -> str | None:
