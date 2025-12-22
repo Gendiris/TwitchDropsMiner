@@ -86,6 +86,7 @@ body {
   font-weight: 500;
 }
 
+/* FOOTER / UPTIME / LOAD */
 .footer-info {
   text-align: center;
   color: var(--text-muted);
@@ -94,6 +95,15 @@ body {
   border-radius: 4px;
   border-top: 1px solid var(--border);
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Desktop Abstand */
+#loadDisplay {
+  margin-top: 6px;
+  font-family: monospace;
 }
 
 .content {
@@ -546,18 +556,30 @@ select {
     display: none;
   }
 
+  /* MOBILE FOOTER FIX */
   .footer-info {
     display: flex;
-    align-items: center;
-    gap: 8px;
+    flex-direction: row; /* WICHTIG: Nebeneinander */
+    align-items: center; /* WICHTIG: Vertikal zentriert */
+    justify-content: center;
+    gap: 10px;
     margin-left: auto;
     background: none;
     border: none;
     padding: 0;
+    margin-top: 0;
+    height: 100%;
   }
 
   #loadDisplay {
-    margin-top: 0 !important;
+    margin-top: 0 !important; /* Kein Abstand oben */
+    display: flex;
+    align-items: center;
+  }
+
+  #uptimeDisplay {
+    display: flex;
+    align-items: center;
   }
 
   .content {
