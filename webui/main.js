@@ -262,6 +262,6 @@ async function pollSnapshot() {
 }
 
 applyUrlParams();
-setInterval(pollSnapshot, 500);
+setInterval(pollSnapshot, 1000);
 setInterval(updateUptime, 1000);
 pollSnapshot();
