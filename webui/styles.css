@@ -128,10 +128,11 @@ button:hover { filter: brightness(1.15); }
 }
 .card-header-complex h3 { margin: 0; color: var(--text-muted); font-size: 1rem; font-weight: 600; display:flex; justify-content:space-between; width:100%; }
 .filter-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.search-prio-group { display: flex; align-items: center; gap: 8px; flex: 1 1 320px; min-width: 0; }
 
 .search-box {
     background: rgba(0,0,0,0.2); border-radius: 4px; padding: 0 8px; display: flex;
-    align-items: center; border: 1px solid transparent; flex: 1 1 150px; height: 32px;
+    align-items: center; border: 1px solid transparent; flex: 1 1 200px; min-width: 0; height: 32px;
 }
 .search-box:focus-within { border-color: var(--accent); }
 .search-box i { color: #666; font-size: 0.8rem; }
@@ -151,6 +152,7 @@ button:hover { filter: brightness(1.15); }
 .prio-toggle {
   display: flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer;
   background: rgba(255,255,255,0.05); padding: 0 10px; height: 32px; border-radius: 4px; color: var(--text-muted); user-select: none;
+  flex: 0 0 auto;
 }
 .prio-toggle:hover { background: rgba(255,255,255,0.1); color: var(--warning); }
 .prio-toggle input { display: none; }
@@ -224,7 +226,8 @@ input, select { width: 100%; box-sizing: border-box; background: var(--bg-input)
   .status-indicator h2 { display: none; }
   .current-watch { display: none; }
   .main-controls { justify-content: flex-end; }
-  .filter-toolbar { gap: 0.5rem; }
-  .search-box { width: 100%; flex: 1 1 100%; }
+  .filter-toolbar { gap: 0.5rem; align-items: stretch; }
+  .search-prio-group { flex: 1 1 100%; }
+  .search-box { width: 100%; flex: 1 1 auto; }
   .grid-2 { grid-template-columns: 1fr; }
 }
