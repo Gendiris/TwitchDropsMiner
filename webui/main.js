@@ -1,49 +1,78 @@
 const refreshMs = 2500;
+// Buttons
 const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
 const reloadBtn = document.getElementById("reloadBtn");
 const switchBtn = document.getElementById("switchBtn");
+
+// Inputs / Displays
 const channelInput = document.getElementById("channelInput");
 const actionStatus = document.getElementById("actionStatus");
 const settingsForm = document.getElementById("settingsForm");
 const settingsStatus = document.getElementById("settingsStatus");
+
+// Status Displays
 const stateText = document.getElementById("stateText");
+const statusDot = document.getElementById("statusDot"); // Neu für Visual
 const watchingText = document.getElementById("watchingText");
 const pendingSwitchText = document.getElementById("pendingSwitchText");
-const lastReloadText = document.getElementById("lastReloadText");
+// const lastReloadText = document.getElementById("lastReloadText"); // Entfernt im UI, optional wieder einbaubar
 const errorsList = document.getElementById("errorsList");
+
+// Tables
 const channelsTable = document.querySelector("#channelsTable tbody");
 const campaignsTable = document.querySelector("#campaignsTable tbody");
 
+// Tab Navigation
+const tabButtons = document.querySelectorAll('.nav-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+
 let pollHandle;
+
+// --- TAB LOGIC ---
+tabButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    // Remove active class from all
+    tabButtons.forEach(b => b.classList.remove('active'));
+    tabContents.forEach(c => c.classList.remove('active'));
+
+    // Add active to clicked
+    btn.classList.add('active');
+    const tabId = `tab-${btn.dataset.tab}`;
+    document.getElementById(tabId).classList.add('active');
+  });
+});
+
+// --- HELPER FUNCTIONS ---
 
 function setActionStatus(message, ok = true) {
   actionStatus.textContent = message || "";
-  actionStatus.style.color = ok ? "#9ea7b3" : "#f85149";
+  actionStatus.style.color = ok ? "#adadb8" : "#ff4f4d";
+
+  // Clear status after 3 seconds for cleaner UI
+  if(message) setTimeout(() => { actionStatus.textContent = ''; }, 3000);
 }
 
 function setSettingsStatus(message, ok = true) {
   settingsStatus.textContent = message || "";
-  settingsStatus.style.color = ok ? "#9ea7b3" : "#f85149";
+  settingsStatus.style.color = ok ? "#00f593" : "#ff4f4d";
+  if(message) setTimeout(() => { settingsStatus.textContent = ''; }, 3000);
 }
 
+// --- API WRAPPERS ---
 async function apiPost(path, payload) {
   const resp = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: payload ? JSON.stringify(payload) : undefined,
   });
-  if (!resp.ok) {
-    throw new Error(`Request failed: ${resp.status}`);
-  }
+  if (!resp.ok) throw new Error(`Request failed: ${resp.status}`);
   return resp.json();
 }
 
 async function apiGet(path) {
   const resp = await fetch(path);
-  if (!resp.ok) {
-    throw new Error(`Request failed: ${resp.status}`);
-  }
+  if (!resp.ok) throw new Error(`Request failed: ${resp.status}`);
   return resp.json();
 }
 
@@ -61,12 +90,9 @@ async function apiPut(path, payload) {
   return data;
 }
 
+// --- SETTINGS LOGIC ---
 function serializeSettings(formData) {
-  const toList = (value) =>
-    value
-      .split(",")
-      .map((v) => v.trim())
-      .filter(Boolean);
+  const toList = (value) => value.split(",").map((v) => v.trim()).filter(Boolean);
 
   return {
     language: formData.get("language") || undefined,
@@ -95,19 +121,29 @@ function fillSettings(settings) {
   settingsForm.autostart_tray.checked = Boolean(settings.autostart_tray);
 }
 
+// --- RENDER LOGIC ---
+
 function renderChannels(channels = []) {
   channelsTable.innerHTML = "";
+  if(channels.length === 0) {
+    channelsTable.innerHTML = "<tr><td colspan='7' style='text-align:center'>Keine Kanäle gefunden</td></tr>";
+    return;
+  }
   channels.forEach((ch) => {
     const tr = document.createElement("tr");
-    const pillClass = `pill status-${ch.status || "offline"}`;
+
+    let statusColor = '#adadb8';
+    if(ch.status === 'online') statusColor = 'var(--success)';
+    if(ch.status === 'offline') statusColor = '#444';
+
     tr.innerHTML = `
-      <td>${ch.id ?? "-"}</td>
-      <td>${ch.login ?? "-"}</td>
+      <td style="font-family:monospace; color: #666;">${ch.id ?? "-"}</td>
+      <td><strong>${ch.login ?? "-"}</strong></td>
       <td>${ch.display_name ?? "-"}</td>
-      <td><span class="${pillClass}">${ch.status ?? "-"}</span></td>
+      <td><span style="color:${statusColor}">● ${ch.status ?? "-"}</span></td>
       <td>${ch.game ?? "-"}</td>
       <td>${ch.viewers ?? "-"}</td>
-      <td>${ch.drops_enabled ? "Yes" : "No"}</td>
+      <td>${ch.drops_enabled ? "<i class='fa-solid fa-check' style='color:var(--success)'></i>" : "<i class='fa-solid fa-xmark'></i>"}</td>
     `;
     channelsTable.appendChild(tr);
   });
@@ -115,99 +151,134 @@ function renderChannels(channels = []) {
 
 function renderCampaigns(campaigns = []) {
   campaignsTable.innerHTML = "";
+  if(campaigns.length === 0) {
+    campaignsTable.innerHTML = "<tr><td colspan='6' style='text-align:center'>Keine aktiven Kampagnen</td></tr>";
+    return;
+  }
+
   campaigns.forEach((c) => {
-    const status = c.active ? "Active" : c.upcoming ? "Upcoming" : c.eligible ? "Eligible" : "Inactive";
-    const window = [c.starts_at, c.ends_at].filter(Boolean).join(" → ");
-    const progress = c.total_drops ? Math.round((c.claimed_drops / c.total_drops) * 100) : 0;
+    const status = c.active ? "<span style='color:var(--success)'>Aktiv</span>" : c.upcoming ? "Bald" : "Inaktiv";
+    const window = [c.starts_at, c.ends_at].filter(Boolean).map(d => new Date(d).toLocaleDateString()).join(" - ");
+
+    // Safety check for math
+    let pct = 0;
+    if(c.total_drops > 0) {
+        pct = Math.round((c.claimed_drops / c.total_drops) * 100);
+    }
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${c.name}</td>
       <td>${c.game}</td>
       <td>${status}</td>
-      <td>${progress}%</td>
+      <td>
+        <div style="display:flex; align-items:center; gap:8px;">
+            <div class="progress-container"><div class="progress-fill" style="width:${pct}%"></div></div>
+            <small>${pct}%</small>
+        </div>
+      </td>
       <td>${c.claimed_drops} / ${c.total_drops}</td>
-      <td>${window || "-"}</td>
+      <td style="font-size:0.8rem">${window || "-"}</td>
     `;
     campaignsTable.appendChild(tr);
   });
 }
 
 function renderRuntime(runtime) {
-  stateText.textContent = runtime.state || "-";
+  stateText.textContent = runtime.state || "Unbekannt";
+
+  // Visual Indicator Logic
+  const parent = document.querySelector('.status-indicator').parentElement;
+  if(runtime.state === 'MINING' || runtime.state === 'WORKING') {
+      parent.classList.add('status-mining');
+      parent.classList.remove('status-stopped');
+  } else {
+      parent.classList.remove('status-mining');
+      parent.classList.add('status-stopped');
+  }
+
   const watching = runtime.watching;
   if (watching) {
-    watchingText.textContent = `${watching.display_name || watching.login || "Unknown"} (${watching.status})`;
+    watchingText.innerHTML = `${watching.display_name || watching.login} <small style='color:var(--accent)'>(${watching.status})</small>`;
   } else {
-    watchingText.textContent = "-";
+    watchingText.textContent = "Wartet...";
   }
-  pendingSwitchText.textContent = runtime.pending_switch ?? "-";
-  lastReloadText.textContent = runtime.last_reload ?? "-";
+
+  if(runtime.pending_switch) {
+      pendingSwitchText.textContent = `(Wechsel zu: ${runtime.pending_switch})`;
+  } else {
+      pendingSwitchText.textContent = "";
+  }
+
+  // Errors list
   errorsList.innerHTML = "";
-  (runtime.errors || []).forEach((err) => {
-    const li = document.createElement("li");
-    li.textContent = err;
-    errorsList.appendChild(li);
-  });
+  if(!runtime.errors || runtime.errors.length === 0) {
+      const li = document.createElement("li");
+      li.textContent = "Keine Fehler protokolliert.";
+      li.style.color = "#444";
+      li.style.listStyle = "none";
+      errorsList.appendChild(li);
+  } else {
+    (runtime.errors || []).forEach((err) => {
+        const li = document.createElement("li");
+        li.textContent = err;
+        li.style.color = "var(--danger)";
+        errorsList.appendChild(li);
+    });
+  }
+
   renderChannels(runtime.channels);
   renderCampaigns(runtime.campaigns);
 }
+
+// --- INITIALIZATION ---
 
 async function loadSettings() {
   try {
     const settings = await apiGet("/api/settings");
     fillSettings(settings);
   } catch (err) {
-    setSettingsStatus(`Failed to load settings: ${err.message}`, false);
+    setSettingsStatus(`Laden fehlgeschlagen: ${err.message}`, false);
   }
 }
 
 async function pollSnapshot() {
   try {
     const data = await apiGet("/api/snapshot");
-    if (data.settings) {
-      fillSettings(data.settings);
-    }
-    if (data.runtime) {
-      renderRuntime(data.runtime);
-    }
+    if (data.settings) fillSettings(data.settings);
+    if (data.runtime) renderRuntime(data.runtime);
   } catch (err) {
-    setActionStatus(`Snapshot error: ${err.message}`, false);
+    setActionStatus(`Snapshot Fehler: ${err.message}`, false);
   }
 }
 
 function startPolling() {
-  if (pollHandle) {
-    clearInterval(pollHandle);
-  }
+  if (pollHandle) clearInterval(pollHandle);
   pollHandle = setInterval(pollSnapshot, refreshMs);
   pollSnapshot();
 }
+
+// --- EVENT LISTENERS ---
 
 startBtn.addEventListener("click", async () => {
   try {
     const res = await apiPost("/api/actions/start");
     setActionStatus(`Start: ${res.status}`);
-  } catch (err) {
-    setActionStatus(err.message, false);
-  }
+  } catch (err) { setActionStatus(err.message, false); }
 });
 
 stopBtn.addEventListener("click", async () => {
   try {
     const res = await apiPost("/api/actions/stop");
     setActionStatus(`Stop: ${res.status}`);
-  } catch (err) {
-    setActionStatus(err.message, false);
-  }
+  } catch (err) { setActionStatus(err.message, false); }
 });
 
 reloadBtn.addEventListener("click", async () => {
   try {
     const res = await apiPost("/api/actions/reload");
     setActionStatus(`Reload: ${res.status}`);
-  } catch (err) {
-    setActionStatus(err.message, false);
-  }
+  } catch (err) { setActionStatus(err.message, false); }
 });
 
 switchBtn.addEventListener("click", async () => {
@@ -216,9 +287,7 @@ switchBtn.addEventListener("click", async () => {
   try {
     const res = await apiPost("/api/actions/switch-channel", payload);
     setActionStatus(`Switch: ${res.status} (${res.channel ?? "auto"})`);
-  } catch (err) {
-    setActionStatus(err.message, false);
-  }
+  } catch (err) { setActionStatus(err.message, false); }
 });
 
 settingsForm.addEventListener("submit", async (event) => {
@@ -226,19 +295,15 @@ settingsForm.addEventListener("submit", async (event) => {
   const payload = serializeSettings(new FormData(settingsForm));
   try {
     await apiPut("/api/settings", payload);
-    setSettingsStatus("Settings saved");
-  } catch (err) {
-    setSettingsStatus(`Save failed: ${err.message}`, false);
-  }
+    setSettingsStatus("Einstellungen gespeichert!");
+  } catch (err) { setSettingsStatus(`Fehler: ${err.message}`, false); }
 });
 
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    clearInterval(pollHandle);
-  } else {
-    startPolling();
-  }
+  if (document.hidden) clearInterval(pollHandle);
+  else startPolling();
 });
 
+// Start
 loadSettings();
 startPolling();

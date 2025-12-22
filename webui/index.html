@@ -1,137 +1,203 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Twitch Drops Miner Web UI</title>
+  <title>Twitch Drops Miner</title>
   <link rel="stylesheet" href="/webui/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-  <header>
-    <h1>Twitch Drops Miner</h1>
-    <p class="subtitle">Lightweight Web UI (auto-refreshes every ~2.5s)</p>
-  </header>
 
-  <main>
-    <section class="card">
-      <h2>Controls</h2>
-      <div class="controls">
-        <button id="startBtn">Start</button>
-        <button id="stopBtn">Stop</button>
-        <button id="reloadBtn">Reload</button>
+  <div class="app-container">
+    <nav class="sidebar">
+      <div class="brand">
+        <i class="fa-brands fa-twitch"></i>
+        <span>Drops Miner</span>
       </div>
-      <div class="switcher">
-        <label for="channelInput">Switch channel (ID, login, or empty for auto):</label>
-        <div class="inline">
-          <input id="channelInput" type="text" placeholder="channel id/login or leave blank">
-          <button id="switchBtn">Switch</button>
-        </div>
+
+      <div class="nav-links">
+        <button class="nav-btn active" data-tab="dashboard">
+          <i class="fa-solid fa-chart-line"></i> Dashboard
+        </button>
+        <button class="nav-btn" data-tab="details">
+          <i class="fa-solid fa-list"></i> Listen & Daten
+        </button>
+        <button class="nav-btn" data-tab="settings">
+          <i class="fa-solid fa-sliders"></i> Einstellungen
+        </button>
       </div>
-      <div id="actionStatus" class="status-message"></div>
-    </section>
 
-    <section class="grid">
-      <article class="card">
-        <h2>Runtime Status</h2>
-        <div class="runtime-row"><strong>State:</strong> <span id="stateText">-</span></div>
-        <div class="runtime-row"><strong>Watching:</strong> <span id="watchingText">-</span></div>
-        <div class="runtime-row"><strong>Pending switch:</strong> <span id="pendingSwitchText">-</span></div>
-        <div class="runtime-row"><strong>Last reload:</strong> <span id="lastReloadText">-</span></div>
-        <div class="runtime-row"><strong>Errors (last 10):</strong>
-          <ul id="errorsList"></ul>
-        </div>
-      </article>
+      <div class="footer-info">
+        <small>Auto-Refresh: ~2.5s</small>
+      </div>
+    </nav>
 
-      <article class="card">
-        <h2>Settings</h2>
-        <form id="settingsForm">
-          <label>
-            Language
-            <input type="text" name="language">
-          </label>
-          <label>
-            Proxy (URL)
-            <input type="text" name="proxy" placeholder="http://user:pass@host:port">
-          </label>
-          <label>
-            Priority (comma separated)
-            <input type="text" name="priority">
-          </label>
-          <label>
-            Exclude (comma separated)
-            <input type="text" name="exclude">
-          </label>
-          <label>
-            Priority mode
-            <select name="priority_mode">
-              <option value="PRIORITY_ONLY">Priority only</option>
-              <option value="ENDING_SOONEST">Ending soonest</option>
-              <option value="LOW_AVBL_FIRST">Low availability first</option>
-            </select>
-          </label>
-          <label class="checkbox">
-            <input type="checkbox" name="available_drops_check"> Available drops check
-          </label>
-          <label class="checkbox">
-            <input type="checkbox" name="enable_badges_emotes"> Enable badges/emotes
-          </label>
-          <label>
-            Connection quality
-            <input type="number" min="0" max="5" name="connection_quality">
-          </label>
-          <label class="checkbox">
-            <input type="checkbox" name="tray_notifications"> Tray notifications
-          </label>
-          <label class="checkbox">
-            <input type="checkbox" name="autostart_tray"> Autostart tray
-          </label>
-          <div class="form-actions">
-            <button type="submit">Save settings</button>
+    <main class="content">
+
+      <div id="tab-dashboard" class="tab-content active">
+
+        <section class="hero-card">
+          <div class="status-indicator">
+            <span class="pulse-dot" id="statusDot"></span>
+            <h2 id="stateText">Initialisiere...</h2>
+          </div>
+
+          <div class="current-watch">
+            <div class="watch-icon">
+              <i class="fa-solid fa-tv"></i>
+            </div>
+            <div class="watch-info">
+              <span class="label">Aktuell geschaut:</span>
+              <strong id="watchingText">-</strong>
+              <span id="pendingSwitchText" class="sub-text"></span>
+            </div>
+          </div>
+
+          <div class="main-controls">
+            <button id="startBtn" class="btn-primary"><i class="fa-solid fa-play"></i> Start</button>
+            <button id="stopBtn" class="btn-danger"><i class="fa-solid fa-stop"></i> Stop</button>
+            <button id="reloadBtn" class="btn-secondary"><i class="fa-solid fa-rotate-right"></i> Reload</button>
+          </div>
+          <div id="actionStatus" class="status-message"></div>
+        </section>
+
+        <section class="grid-2">
+          <div class="card">
+            <h3><i class="fa-solid fa-shuffle"></i> Kanal wechseln</h3>
+            <div class="switcher-box">
+              <input id="channelInput" type="text" placeholder="ID oder Login (leer lassen für Auto)">
+              <button id="switchBtn" class="btn-accent">Switch</button>
+            </div>
+          </div>
+
+          <div class="card error-card">
+            <h3><i class="fa-solid fa-triangle-exclamation"></i> Letzte Logs/Fehler</h3>
+            <ul id="errorsList" class="scrolling-list"></ul>
+          </div>
+        </section>
+      </div>
+
+      <div id="tab-details" class="tab-content">
+        <section class="card full-width">
+          <div class="card-header">
+            <h3>Aktive Kampagnen</h3>
+          </div>
+          <div class="table-wrapper">
+            <table id="campaignsTable">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Spiel</th>
+                  <th>Status</th>
+                  <th>Fortschritt</th>
+                  <th>Claimed</th>
+                  <th>Zeitraum</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card full-width mt-1">
+          <div class="card-header">
+            <h3>Kanal Status</h3>
+          </div>
+          <div class="table-wrapper">
+            <table id="channelsTable">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Login</th>
+                  <th>Name</th>
+                  <th>Status</th>
+                  <th>Spiel</th>
+                  <th>Viewer</th>
+                  <th>Drops</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <div id="tab-settings" class="tab-content">
+        <section class="card">
+          <div class="card-header">
+            <h3>Konfiguration</h3>
             <span id="settingsStatus" class="status-message"></span>
           </div>
-        </form>
-      </article>
-    </section>
 
-    <section class="card">
-      <h2>Channels</h2>
-      <div class="table-wrapper">
-        <table id="channelsTable">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Login</th>
-              <th>Name</th>
-              <th>Status</th>
-              <th>Game</th>
-              <th>Viewers</th>
-              <th>Drops</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </section>
+          <form id="settingsForm">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Sprache</label>
+                <input type="text" name="language" placeholder="z.B. en, de">
+              </div>
 
-    <section class="card">
-      <h2>Campaigns</h2>
-      <div class="table-wrapper">
-        <table id="campaignsTable">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Game</th>
-              <th>Status</th>
-              <th>Progress</th>
-              <th>Claimed / Total</th>
-              <th>Window</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+              <div class="form-group">
+                <label>Proxy URL</label>
+                <input type="text" name="proxy" placeholder="http://user:pass@host:port">
+              </div>
+
+              <div class="form-group">
+                <label>Priorität (Kommagetrennt)</label>
+                <input type="text" name="priority">
+              </div>
+
+              <div class="form-group">
+                <label>Ausschluss (Kommagetrennt)</label>
+                <input type="text" name="exclude">
+              </div>
+
+              <div class="form-group">
+                <label>Prioritäts-Modus</label>
+                <select name="priority_mode">
+                  <option value="PRIORITY_ONLY">Nur Priorität</option>
+                  <option value="ENDING_SOONEST">Endet bald</option>
+                  <option value="LOW_AVBL_FIRST">Seltene zuerst</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Verbindungsqualität (0-5)</label>
+                <input type="number" min="0" max="5" name="connection_quality">
+              </div>
+            </div>
+
+            <div class="toggles-grid">
+              <label class="toggle-card">
+                <input type="checkbox" name="available_drops_check">
+                <span>Available drops check</span>
+              </label>
+
+              <label class="toggle-card">
+                <input type="checkbox" name="enable_badges_emotes">
+                <span>Badges & Emotes farmen</span>
+              </label>
+
+              <label class="toggle-card">
+                <input type="checkbox" name="tray_notifications">
+                <span>Tray Benachrichtigungen</span>
+              </label>
+
+              <label class="toggle-card">
+                <input type="checkbox" name="autostart_tray">
+                <span>Autostart Tray</span>
+              </label>
+            </div>
+
+            <div class="form-actions right">
+              <button type="submit" class="btn-primary large">Einstellungen speichern</button>
+            </div>
+          </form>
+        </section>
       </div>
-    </section>
-  </main>
+
+    </main>
+  </div>
 
   <script src="/webui/main.js"></script>
 </body>
