@@ -4,6 +4,7 @@ import json
 import asyncio
 import logging
 import random
+import base64
 from time import time
 from copy import deepcopy
 from itertools import chain
@@ -378,6 +379,10 @@ class _AuthState:
             and self._session_expires_at is not None
             and self._session_expires_at > now
         ):
+            logger.debug(
+                "Skipping auth validation; session valid for another %.1fs",
+                (self._session_expires_at - now).total_seconds(),
+            )
             return
 
         if not self._hasattrs("device_id"):
@@ -406,8 +411,15 @@ class _AuthState:
             validate_response = await response.json()
 
         expires_in = validate_response.get("expires_in")
-        if isinstance(expires_in, int):
-            self._session_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        expires_ref = datetime.now(timezone.utc)
+        if isinstance(expires_in, int) and expires_in > 0:
+            self._session_expires_at = expires_ref + timedelta(seconds=expires_in)
+        else:
+            token_expiration = self._extract_access_token_exp()
+            if token_expiration is not None and token_expiration > expires_ref:
+                self._session_expires_at = token_expiration
+            else:
+                self._session_expires_at = expires_ref + timedelta(minutes=15)
 
         if validate_response["client_id"] != client_info.CLIENT_ID:
             logger.info("Cookie client ID mismatch")
@@ -424,6 +436,24 @@ class _AuthState:
     def invalidate(self):
         self._delattrs("access_token", "user_id", "_session_expires_at")
         self._logged_in.clear()
+
+    def _extract_access_token_exp(self) -> datetime | None:
+        # Access tokens from Twitch often aren't JWTs, but derive the expiry if possible.
+        parts = self.access_token.split(".")
+        if len(parts) < 2:
+            return None
+        payload = parts[1]
+        try:
+            payload += "=" * (-len(payload) % 4)
+            decoded = base64.urlsafe_b64decode(payload)
+            payload_json = json.loads(decoded)
+            exp = payload_json.get("exp")
+            if isinstance(exp, (int, float)):
+                return datetime.fromtimestamp(exp, tz=timezone.utc)
+        except (ValueError, json.JSONDecodeError):
+            logger.debug("Failed to decode access token expiry", exc_info=True)
+            return None
+        return None
 
 
 class Twitch:
