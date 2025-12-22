@@ -1,6 +1,5 @@
 const ui = {
   startBtn: document.getElementById("startBtn"),
-  stopBtn: document.getElementById("stopBtn"),
   reloadBtn: document.getElementById("reloadBtn"),
   actionStatus: document.getElementById("actionStatus"),
   settingsForm: document.getElementById("settingsForm"),
@@ -222,7 +221,6 @@ ui.filterPriorityBtn.onchange = () => { updateUrl(); if(lastRuntime) renderTable
 ui.sortSelect.onchange = (e) => { sortMode = e.target.value; updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
 
 ui.startBtn.onclick = () => apiCall("/api/actions/start");
-ui.stopBtn.onclick = () => apiCall("/api/actions/stop");
 ui.reloadBtn.onclick = () => apiCall("/api/actions/reload");
 
 ui.settingsForm.onsubmit = async (e) => {
