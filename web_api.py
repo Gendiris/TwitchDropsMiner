@@ -116,6 +116,7 @@ class WebAPI:
         if not webui_dir.exists():
             return
         self._app.router.add_get("/", self._serve_index)
+        self._app.router.add_get("/webui", self._serve_index)
         self._app.router.add_static("/webui", webui_dir)
 
     async def _serve_index(self, _: web.Request) -> web.StreamResponse:
