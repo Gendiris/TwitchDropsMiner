@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import base64
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
@@ -26,15 +24,11 @@ class WebAPI:
     def __init__(
         self,
         service,
-        *,
-        token: str | None = None,
-        basic_user: str | None = None,
-        basic_password: str | None = None,
     ) -> None:
         from miner_service import MinerService
 
         self._service: MinerService = service
-        self._app = web.Application(middlewares=[self._auth_middleware])
+        self._app = web.Application()
         self._app.add_routes(
             [
                 web.get("/api/health", self._health),
@@ -51,10 +45,6 @@ class WebAPI:
         self._register_webui()
         self._runner: web.AppRunner | None = None
         self._site: web.TCPSite | None = None
-        self._token = token
-        self._basic_user = basic_user
-        self._basic_password = basic_password
-        self._auth_required = any((token, basic_user, basic_password))
 
     async def start(self, bind: str) -> None:
         host, port = _parse_bind(bind)
@@ -71,21 +61,6 @@ class WebAPI:
         if self._runner is not None:
             await self._runner.cleanup()
             self._runner = None
-
-    @web.middleware
-    async def _auth_middleware(self, request: web.Request, handler):
-        if not self._auth_required:
-            return await handler(request)
-
-        if self._token and self._token == _extract_token(request):
-            return await handler(request)
-
-        if self._basic_user and self._basic_password and _validate_basic_auth(
-            request, self._basic_user, self._basic_password
-        ):
-            return await handler(request)
-
-        return web.Response(status=401, headers={"WWW-Authenticate": 'Basic realm="TwitchDrops"'})
 
     async def _health(self, _: web.Request) -> web.Response:
         return web.json_response({"status": "ok", "running": self._service.is_running})
@@ -141,6 +116,7 @@ class WebAPI:
         if not webui_dir.exists():
             return
         self._app.router.add_get("/", self._serve_index)
+        self._app.router.add_get("/webui", self._serve_index)
         self._app.router.add_static("/webui", webui_dir)
 
     async def _serve_index(self, _: web.Request) -> web.StreamResponse:
@@ -148,32 +124,6 @@ class WebAPI:
         if not index_path.exists():
             return web.Response(status=404, text="Web UI is not available.")
         return web.FileResponse(index_path)
-
-
-def _extract_token(request: web.Request) -> str | None:
-    auth = request.headers.get("Authorization")
-    if not auth:
-        return request.headers.get("X-Api-Token")
-    if auth.startswith("Bearer "):
-        return auth.removeprefix("Bearer ").strip()
-    if auth.startswith("Token "):
-        return auth.removeprefix("Token ").strip()
-    return None
-
-
-def _validate_basic_auth(request: web.Request, username: str, password: str) -> bool:
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Basic "):
-        return False
-    try:
-        decoded = base64.b64decode(auth_header.removeprefix("Basic ").strip()).decode()
-    except (ValueError, UnicodeDecodeError):
-        return False
-    try:
-        user, pwd = decoded.split(":", 1)
-    except ValueError:
-        return False
-    return user == username and pwd == password
 
 
 def _apply_settings(settings: Any, payload: dict[str, Any]) -> tuple[bool, list[str]]:
@@ -224,12 +174,4 @@ def build_api(service) -> WebAPI | None:
     bind = getattr(service.settings, "bind", None)
     if not bind:
         return None
-    token = os.getenv("API_TOKEN")
-    basic_user = os.getenv("API_BASIC_USER")
-    basic_password = os.getenv("API_BASIC_PASSWORD")
-    return WebAPI(
-        service,
-        token=token,
-        basic_user=basic_user,
-        basic_password=basic_password,
-    )
+    return WebAPI(service)
