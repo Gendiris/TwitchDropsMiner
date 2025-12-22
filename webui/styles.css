@@ -86,7 +86,6 @@ body {
   font-weight: 500;
 }
 
-/* FOOTER / UPTIME / LOAD */
 .footer-info {
   text-align: center;
   color: var(--text-muted);
@@ -97,12 +96,18 @@ body {
   margin-top: auto;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 4px;
 }
 
-/* Desktop Abstand */
+#uptimeDisplay, #loadDisplay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
 #loadDisplay {
-  margin-top: 6px;
   font-family: monospace;
 }
 
@@ -556,13 +561,12 @@ select {
     display: none;
   }
 
-  /* MOBILE FOOTER FIX */
   .footer-info {
     display: flex;
-    flex-direction: row; /* WICHTIG: Nebeneinander */
-    align-items: center; /* WICHTIG: Vertikal zentriert */
+    flex-direction: row;
+    align-items: center;
     justify-content: center;
-    gap: 10px;
+    gap: 15px;
     margin-left: auto;
     background: none;
     border: none;
@@ -572,14 +576,7 @@ select {
   }
 
   #loadDisplay {
-    margin-top: 0 !important; /* Kein Abstand oben */
-    display: flex;
-    align-items: center;
-  }
-
-  #uptimeDisplay {
-    display: flex;
-    align-items: center;
+    margin-top: 0 !important;
   }
 
   .content {
