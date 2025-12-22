@@ -16,26 +16,47 @@ const ui = {
   campaignsTable: document.querySelector("#campaignsTable tbody"),
   tabButtons: document.querySelectorAll('.nav-btn'),
   uptimeDisplay: document.getElementById("uptimeDisplay"),
-  filterPriorityBtn: document.getElementById("filterPriorityBtn") // Neu
+  filterPriorityBtn: document.getElementById("filterPriorityBtn"),
+  searchInput: document.getElementById("searchInput"),
+  filterChips: document.querySelectorAll(".filter-chip")
 };
 
 let pollHandle;
 let startTime = null;
-let lastRuntime = null; // Um sofortiges Neuzeichnen zu ermöglichen
-let currentPriority = []; // Liste der prio spiele
+let lastRuntime = null;
+let currentPriority = [];
 
-// --- TABS ---
+let filterMode = 'all';
+let filterSearch = '';
+
 ui.tabButtons.forEach(btn => {
   btn.addEventListener('click', () => {
     ui.tabButtons.forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
   });
 });
 
-// --- API ---
+ui.filterChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+        ui.filterChips.forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        filterMode = chip.dataset.filter;
+        if(lastRuntime) renderTables(lastRuntime);
+    });
+});
+
+ui.searchInput.addEventListener('input', (e) => {
+    filterSearch = e.target.value.toLowerCase();
+    if(lastRuntime) renderTables(lastRuntime);
+});
+
+ui.filterPriorityBtn.addEventListener('change', () => {
+    if(lastRuntime) renderTables(lastRuntime);
+});
+
+
 async function apiCall(path, method = "GET", payload = null) {
   const options = { method, headers: { "Content-Type": "application/json" } };
   if (payload) options.body = JSON.stringify(payload);
@@ -47,7 +68,6 @@ async function apiCall(path, method = "GET", payload = null) {
   return resp.json();
 }
 
-// --- RENDER ---
 function renderRuntime(runtime) {
   ui.stateText.textContent = runtime.state || "Unbekannt";
   const isWorking = ['MINING', 'WORKING'].includes(runtime.state);
@@ -88,28 +108,30 @@ function renderRuntime(runtime) {
 }
 
 function renderTables(runtime) {
-  // --- KAMPAGNEN & DROPS ---
   ui.campaignsTable.innerHTML = "";
 
-  // Sortiere aktive Kampagnen nach oben
   const sortedCampaigns = (runtime.campaigns || []).sort((a, b) => b.active - a.active);
 
-  // Lese Filter Status
-  const filterActive = ui.filterPriorityBtn.checked;
-
+  const filterPrio = ui.filterPriorityBtn.checked;
   let visibleCount = 0;
 
   sortedCampaigns.forEach(c => {
-    // FILTER LOGIK
-    if (filterActive) {
-        // Prüfen, ob das Spiel in der Prio Liste ist (Case-Insensitive)
-        const isPrio = currentPriority.some(p => p.toLowerCase() === c.game.toLowerCase());
-        if (!isPrio) return; // Überspringen
+    if (filterSearch && !c.game.toLowerCase().includes(filterSearch) && !c.name.toLowerCase().includes(filterSearch)) {
+        return;
     }
+
+    if (filterPrio) {
+        const isPrio = currentPriority.some(p => p.toLowerCase() === c.game.toLowerCase());
+        if (!isPrio) return;
+    }
+
+    if (filterMode === 'active' && !c.active) return;
+    const hasProgress = (c.drops || []).some(d => d.current_minutes > 0 && !d.claimed);
+    if (filterMode === 'progressing' && !hasProgress) return;
+    if (filterMode === 'claimed' && c.claimed_drops === 0) return;
 
     visibleCount++;
 
-    // HTML Generierung
     let dropsHtml = '<div class="drops-list">';
     (c.drops || []).forEach(d => {
         let pct = 0;
@@ -158,8 +180,7 @@ function renderTables(runtime) {
   });
 
   if (visibleCount === 0) {
-      const msg = filterActive ? "Keine Prio-Kampagnen aktiv" : "Keine Kampagnen gefunden";
-      ui.campaignsTable.innerHTML = `<tr><td colspan='3' style='text-align:center; padding:20px; color:#666'>${msg}</td></tr>`;
+      ui.campaignsTable.innerHTML = `<tr><td colspan='3' style='text-align:center; padding:20px; color:#666'>Keine Kampagnen für diesen Filter</td></tr>`;
   }
 
   // --- KANÄLE ---
@@ -187,7 +208,6 @@ function updateUptime() {
     ui.uptimeDisplay.innerHTML = `<i class="fa-regular fa-clock"></i> ${hh}:${mm}:${ss}`;
 }
 
-// --- SETTINGS ---
 function fillSettings(s) {
   const f = ui.settingsForm;
   f.language.value = s.language ?? "";
@@ -221,19 +241,14 @@ function readSettings() {
   };
 }
 
-// --- POLLING ---
 async function pollSnapshot() {
   try {
     const data = await apiCall("/api/snapshot");
     const isEditing = ui.settingsForm.contains(document.activeElement);
 
     if (data.settings) {
-        // Prio Liste aktualisieren
         currentPriority = data.settings.priority || [];
-
-        if (!isEditing) {
-            fillSettings(data.settings);
-        }
+        if (!isEditing) fillSettings(data.settings);
     }
 
     if (data.runtime) {
@@ -249,10 +264,6 @@ ui.startBtn.onclick = () => apiCall("/api/actions/start").then(r => ui.actionSta
 ui.stopBtn.onclick = () => apiCall("/api/actions/stop").then(r => ui.actionStatus.textContent = "Gestoppt").catch(e => alert(e));
 ui.reloadBtn.onclick = () => apiCall("/api/actions/reload").then(r => ui.actionStatus.textContent = "Reloading...").catch(e => alert(e));
 
-ui.filterPriorityBtn.onchange = () => {
-    if(lastRuntime) renderTables(lastRuntime);
-};
-
 ui.settingsForm.onsubmit = async (e) => {
     e.preventDefault();
     try {
@@ -266,7 +277,6 @@ ui.settingsForm.onsubmit = async (e) => {
     }
 };
 
-// Start
 setInterval(pollSnapshot, refreshMs);
 setInterval(updateUptime, 1000);
 pollSnapshot();
