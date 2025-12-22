@@ -16,6 +16,7 @@ const ui = {
   campaignsTable: document.querySelector("#campaignsTable tbody"),
   tabButtons: document.querySelectorAll('.nav-btn'),
   uptimeDisplay: document.getElementById("uptimeDisplay"),
+  // Filter elements
   filterPriorityBtn: document.getElementById("filterPriorityBtn"),
   searchInput: document.getElementById("searchInput"),
   filterChips: document.querySelectorAll(".filter-chip")
@@ -26,15 +27,69 @@ let startTime = null;
 let lastRuntime = null;
 let currentPriority = [];
 
-let filterMode = 'all';
+// Status Variablen
+let filterMode = 'all'; // all, progressing, active, claimed
 let filterSearch = '';
 
+// --- URL HANDLING (NEU) ---
+function applyUrlParams() {
+    const params = new URLSearchParams(window.location.search);
+
+    // 1. Tab Selection
+    const tabParam = params.get('tab');
+    if (tabParam) {
+        const btn = document.querySelector(`.nav-btn[data-tab="${tabParam}"]`);
+        if (btn) btn.click();
+    }
+
+    // 2. Search
+    const searchParam = params.get('search');
+    if (searchParam) {
+        ui.searchInput.value = searchParam;
+        filterSearch = searchParam.toLowerCase();
+    }
+
+    // 3. Filter Mode
+    const filterParam = params.get('filter');
+    if (filterParam) {
+        const chip = document.querySelector(`.filter-chip[data-filter="${filterParam}"]`);
+        if (chip) {
+            ui.filterChips.forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            filterMode = filterParam;
+        }
+    }
+
+    // 4. Priority Toggle
+    const prioParam = params.get('prio');
+    if (prioParam === 'true' || prioParam === '1') {
+        ui.filterPriorityBtn.checked = true;
+    }
+}
+
+function updateUrl() {
+    const params = new URLSearchParams();
+
+    // Nur speichern, wenn vom Standard abweicht, um URL sauber zu halten
+    const activeTab = document.querySelector('.nav-btn.active');
+    if(activeTab && activeTab.dataset.tab !== 'dashboard') params.set('tab', activeTab.dataset.tab);
+
+    if(filterSearch) params.set('search', filterSearch);
+    if(filterMode !== 'all') params.set('filter', filterMode);
+    if(ui.filterPriorityBtn.checked) params.set('prio', 'true');
+
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({}, '', newUrl);
+}
+
+// --- TABS & EVENTS ---
 ui.tabButtons.forEach(btn => {
   btn.addEventListener('click', () => {
     ui.tabButtons.forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+    updateUrl();
   });
 });
 
@@ -43,20 +98,24 @@ ui.filterChips.forEach(chip => {
         ui.filterChips.forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         filterMode = chip.dataset.filter;
+        updateUrl();
         if(lastRuntime) renderTables(lastRuntime);
     });
 });
 
 ui.searchInput.addEventListener('input', (e) => {
     filterSearch = e.target.value.toLowerCase();
+    updateUrl();
     if(lastRuntime) renderTables(lastRuntime);
 });
 
 ui.filterPriorityBtn.addEventListener('change', () => {
+    updateUrl();
     if(lastRuntime) renderTables(lastRuntime);
 });
 
 
+// --- API ---
 async function apiCall(path, method = "GET", payload = null) {
   const options = { method, headers: { "Content-Type": "application/json" } };
   if (payload) options.body = JSON.stringify(payload);
@@ -68,6 +127,7 @@ async function apiCall(path, method = "GET", payload = null) {
   return resp.json();
 }
 
+// --- RENDER ---
 function renderRuntime(runtime) {
   ui.stateText.textContent = runtime.state || "Unbekannt";
   const isWorking = ['MINING', 'WORKING'].includes(runtime.state);
@@ -111,23 +171,29 @@ function renderTables(runtime) {
   ui.campaignsTable.innerHTML = "";
 
   const sortedCampaigns = (runtime.campaigns || []).sort((a, b) => b.active - a.active);
-
   const filterPrio = ui.filterPriorityBtn.checked;
   let visibleCount = 0;
 
   sortedCampaigns.forEach(c => {
+    // 1. Search Filter
     if (filterSearch && !c.game.toLowerCase().includes(filterSearch) && !c.name.toLowerCase().includes(filterSearch)) {
         return;
     }
 
+    // 2. Priority Filter
     if (filterPrio) {
         const isPrio = currentPriority.some(p => p.toLowerCase() === c.game.toLowerCase());
         if (!isPrio) return;
     }
 
+    // 3. Mode Filter
     if (filterMode === 'active' && !c.active) return;
+
+    // Progressing: Has mins > 0 AND not all claimed
     const hasProgress = (c.drops || []).some(d => d.current_minutes > 0 && !d.claimed);
     if (filterMode === 'progressing' && !hasProgress) return;
+
+    // Claimed: interpreted as "finished or claimed drops"
     if (filterMode === 'claimed' && c.claimed_drops === 0) return;
 
     visibleCount++;
@@ -183,7 +249,6 @@ function renderTables(runtime) {
       ui.campaignsTable.innerHTML = `<tr><td colspan='3' style='text-align:center; padding:20px; color:#666'>Keine Kampagnen für diesen Filter</td></tr>`;
   }
 
-  // --- KANÄLE ---
   ui.channelsTable.innerHTML = "";
   (runtime.channels || []).forEach(ch => {
     const tr = document.createElement("tr");
@@ -200,14 +265,13 @@ function updateUptime() {
     if(!startTime) return;
     const now = new Date();
     const diff = now - startTime;
-
     const hh = Math.floor(diff / 3600000).toString().padStart(2, '0');
     const mm = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
     const ss = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-
     ui.uptimeDisplay.innerHTML = `<i class="fa-regular fa-clock"></i> ${hh}:${mm}:${ss}`;
 }
 
+// --- SETTINGS HELPER ---
 function fillSettings(s) {
   const f = ui.settingsForm;
   f.language.value = s.language ?? "";
@@ -226,7 +290,6 @@ function fillSettings(s) {
 function readSettings() {
   const f = new FormData(ui.settingsForm);
   const list = (k) => f.get(k).split(",").map(x => x.trim()).filter(Boolean);
-
   return {
     language: f.get("language"),
     proxy: f.get("proxy"),
@@ -241,6 +304,7 @@ function readSettings() {
   };
 }
 
+// --- POLLING ---
 async function pollSnapshot() {
   try {
     const data = await apiCall("/api/snapshot");
@@ -250,7 +314,6 @@ async function pollSnapshot() {
         currentPriority = data.settings.priority || [];
         if (!isEditing) fillSettings(data.settings);
     }
-
     if (data.runtime) {
       lastRuntime = data.runtime;
       renderRuntime(data.runtime);
@@ -260,6 +323,8 @@ async function pollSnapshot() {
   }
 }
 
+// --- INITIALIZE ---
+// 1. UI Bindings
 ui.startBtn.onclick = () => apiCall("/api/actions/start").then(r => ui.actionStatus.textContent = "Gestartet").catch(e => alert(e));
 ui.stopBtn.onclick = () => apiCall("/api/actions/stop").then(r => ui.actionStatus.textContent = "Gestoppt").catch(e => alert(e));
 ui.reloadBtn.onclick = () => apiCall("/api/actions/reload").then(r => ui.actionStatus.textContent = "Reloading...").catch(e => alert(e));
@@ -277,6 +342,8 @@ ui.settingsForm.onsubmit = async (e) => {
     }
 };
 
+// 2. Start Logic
+applyUrlParams(); // Lese URL bevor das erste Polling startet
 setInterval(pollSnapshot, refreshMs);
 setInterval(updateUptime, 1000);
 pollSnapshot();
