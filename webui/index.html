@@ -36,26 +36,26 @@
       <div id="tab-dashboard" class="tab-content active">
 
         <section class="hero-card">
-          <div class="status-indicator">
-            <span class="pulse-dot" id="statusDot"></span>
-            <h2 id="stateText">Status</h2>
-          </div>
+          <div class="status-group">
+             <div class="status-indicator">
+                <span class="pulse-dot" id="statusDot"></span>
+                <h2 id="stateText">Status</h2>
+             </div>
 
-          <div class="current-watch">
-            <div class="watch-icon">
-              <i class="fa-solid fa-tv"></i>
-            </div>
-            <div class="watch-info">
-              <span class="label">Watch</span>
-              <strong id="watchingText">-</strong>
-              <span id="pendingSwitchText" class="sub-text"></span>
-            </div>
+             <div class="current-watch">
+                <i class="fa-solid fa-tv watch-icon"></i>
+                <span id="watchingText">-</span>
+                <span id="pendingSwitchText" class="sub-text"></span>
+             </div>
           </div>
 
           <div class="main-controls">
-            <button id="startBtn" class="btn-primary" title="Start"><i class="fa-solid fa-play"></i></button>
-            <button id="stopBtn" class="btn-danger" title="Stop"><i class="fa-solid fa-stop"></i></button>
-            <button id="reloadBtn" class="btn-secondary" title="Reload"><i class="fa-solid fa-rotate-right"></i></button>
+            <button id="startBtn" class="btn-primary" title="Mining Starten">
+                <i class="fa-solid fa-play"></i> <span>Start</span>
+            </button>
+            <button id="reloadBtn" class="btn-secondary" title="Konfig neu laden">
+                <i class="fa-solid fa-rotate-right"></i> <span>Reload</span>
+            </button>
           </div>
           <div id="actionStatus" class="status-message"></div>
         </section>
@@ -64,7 +64,7 @@
           <div class="card-header-complex">
             <h3>
                 <span>Drops</span>
-                <span id="dropsCounter" style="font-size:0.8rem; font-weight:normal; opacity:0.6">0</span>
+                <span id="dropsCounter" style="font-size:0.8rem; font-weight:normal; opacity:0.6; margin-left:8px;">0</span>
             </h3>
 
             <div class="filter-toolbar">
