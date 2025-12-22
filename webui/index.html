@@ -68,9 +68,16 @@
             </h3>
 
             <div class="filter-toolbar">
-                <div class="search-box">
-                    <i class="fa-solid fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Suche...">
+                <div class="search-prio-group">
+                    <div class="search-box">
+                        <i class="fa-solid fa-search"></i>
+                        <input type="text" id="searchInput" placeholder="Suche...">
+                    </div>
+
+                    <label class="prio-toggle" title="Nur Prio">
+                        <input type="checkbox" id="filterPriorityBtn">
+                        <span>★</span>
+                    </label>
                 </div>
 
                 <select id="sortSelect" class="sort-select">
@@ -84,11 +91,6 @@
                     <button class="filter-chip" data-filter="progressing">Laufend</button>
                     <button class="filter-chip" data-filter="active">Aktiv</button>
                 </div>
-
-                <label class="prio-toggle" title="Nur Prio">
-                    <input type="checkbox" id="filterPriorityBtn">
-                    <span>★</span>
-                </label>
             </div>
           </div>
 
