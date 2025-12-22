@@ -16,10 +16,14 @@ const ui = {
   campaignsTable: document.querySelector("#campaignsTable tbody"),
   tabButtons: document.querySelectorAll('.nav-btn'),
   uptimeDisplay: document.getElementById("uptimeDisplay"),
+  loadDisplay: document.getElementById("loadDisplay"), // NEU
+
   // Filter elements
   filterPriorityBtn: document.getElementById("filterPriorityBtn"),
   searchInput: document.getElementById("searchInput"),
-  filterChips: document.querySelectorAll(".filter-chip")
+  filterChips: document.querySelectorAll(".filter-chip"),
+  sortSelect: document.getElementById("sortSelect"),
+  dropsCounter: document.getElementById("dropsCounter")
 };
 
 let pollHandle;
@@ -28,28 +32,26 @@ let lastRuntime = null;
 let currentPriority = [];
 
 // Status Variablen
-let filterMode = 'all'; // all, progressing, active, claimed
+let filterMode = 'all';
 let filterSearch = '';
+let sortMode = 'priority'; // priority, progress, name
 
-// --- URL HANDLING (NEU) ---
+// --- URL HANDLING ---
 function applyUrlParams() {
     const params = new URLSearchParams(window.location.search);
 
-    // 1. Tab Selection
     const tabParam = params.get('tab');
     if (tabParam) {
         const btn = document.querySelector(`.nav-btn[data-tab="${tabParam}"]`);
         if (btn) btn.click();
     }
 
-    // 2. Search
     const searchParam = params.get('search');
     if (searchParam) {
         ui.searchInput.value = searchParam;
         filterSearch = searchParam.toLowerCase();
     }
 
-    // 3. Filter Mode
     const filterParam = params.get('filter');
     if (filterParam) {
         const chip = document.querySelector(`.filter-chip[data-filter="${filterParam}"]`);
@@ -60,7 +62,12 @@ function applyUrlParams() {
         }
     }
 
-    // 4. Priority Toggle
+    const sortParam = params.get('sort');
+    if (sortParam) {
+        ui.sortSelect.value = sortParam;
+        sortMode = sortParam;
+    }
+
     const prioParam = params.get('prio');
     if (prioParam === 'true' || prioParam === '1') {
         ui.filterPriorityBtn.checked = true;
@@ -70,12 +77,12 @@ function applyUrlParams() {
 function updateUrl() {
     const params = new URLSearchParams();
 
-    // Nur speichern, wenn vom Standard abweicht, um URL sauber zu halten
     const activeTab = document.querySelector('.nav-btn.active');
     if(activeTab && activeTab.dataset.tab !== 'dashboard') params.set('tab', activeTab.dataset.tab);
 
     if(filterSearch) params.set('search', filterSearch);
     if(filterMode !== 'all') params.set('filter', filterMode);
+    if(sortMode !== 'priority') params.set('sort', sortMode);
     if(ui.filterPriorityBtn.checked) params.set('prio', 'true');
 
     const newUrl = `${window.location.pathname}?${params.toString()}`;
@@ -114,6 +121,12 @@ ui.filterPriorityBtn.addEventListener('change', () => {
     if(lastRuntime) renderTables(lastRuntime);
 });
 
+ui.sortSelect.addEventListener('change', (e) => {
+    sortMode = e.target.value;
+    updateUrl();
+    if(lastRuntime) renderTables(lastRuntime);
+});
+
 
 // --- API ---
 async function apiCall(path, method = "GET", payload = null) {
@@ -146,7 +159,7 @@ function renderRuntime(runtime) {
   } else {
     ui.watchingText.textContent = "Wartet / Idle";
   }
-  ui.pendingSwitchText.textContent = runtime.pending_switch ? `(Switching to: ${runtime.pending_switch})` : "";
+  ui.pendingSwitchText.textContent = runtime.pending_switch ? `(Wechselt zu: ${runtime.pending_switch})` : "";
 
   ui.errorsList.innerHTML = "";
   if(!runtime.errors || runtime.errors.length === 0) {
@@ -164,36 +177,52 @@ function renderRuntime(runtime) {
     startTime = new Date(runtime.started_at);
   }
 
+  // LOAD DISPLAY UPDATE
+  if (runtime.sys_load) {
+      ui.loadDisplay.innerHTML = `<i class="fa-solid fa-microchip"></i> ${runtime.sys_load}`;
+  }
+
   renderTables(runtime);
+}
+
+function getCampaignProgress(c) {
+    let totalMin = 0;
+    let currentMin = 0;
+    (c.drops || []).forEach(d => {
+        totalMin += d.required_minutes;
+        currentMin += d.current_minutes;
+    });
+    if(totalMin === 0) return 0;
+    return (currentMin / totalMin) * 100;
 }
 
 function renderTables(runtime) {
   ui.campaignsTable.innerHTML = "";
 
-  const sortedCampaigns = (runtime.campaigns || []).sort((a, b) => b.active - a.active);
+  let campaigns = [...(runtime.campaigns || [])];
+
+  campaigns.sort((a, b) => {
+      if (sortMode === 'name') {
+          return a.game.localeCompare(b.game);
+      } else if (sortMode === 'progress') {
+          return getCampaignProgress(b) - getCampaignProgress(a);
+      } else {
+          return (b.active - a.active) || a.game.localeCompare(b.game);
+      }
+  });
+
   const filterPrio = ui.filterPriorityBtn.checked;
   let visibleCount = 0;
 
-  sortedCampaigns.forEach(c => {
-    // 1. Search Filter
-    if (filterSearch && !c.game.toLowerCase().includes(filterSearch) && !c.name.toLowerCase().includes(filterSearch)) {
-        return;
-    }
-
-    // 2. Priority Filter
+  campaigns.forEach(c => {
+    if (filterSearch && !c.game.toLowerCase().includes(filterSearch) && !c.name.toLowerCase().includes(filterSearch)) return;
     if (filterPrio) {
         const isPrio = currentPriority.some(p => p.toLowerCase() === c.game.toLowerCase());
         if (!isPrio) return;
     }
-
-    // 3. Mode Filter
     if (filterMode === 'active' && !c.active) return;
-
-    // Progressing: Has mins > 0 AND not all claimed
     const hasProgress = (c.drops || []).some(d => d.current_minutes > 0 && !d.claimed);
     if (filterMode === 'progressing' && !hasProgress) return;
-
-    // Claimed: interpreted as "finished or claimed drops"
     if (filterMode === 'claimed' && c.claimed_drops === 0) return;
 
     visibleCount++;
@@ -214,7 +243,7 @@ function renderTables(runtime) {
             <div class="drop-item">
                 <div class="drop-header">
                     <span class="drop-name">${d.name} ${statusIcon}</span>
-                    <span class="drop-mins">${d.current_minutes} / ${d.required_minutes} min</span>
+                    <span class="drop-mins">${d.current_minutes} / ${d.required_minutes} m</span>
                 </div>
                 <div class="progress-container">
                     <div class="progress-fill" style="width:${pct}%; background-color: ${barColor}"></div>
@@ -231,24 +260,27 @@ function renderTables(runtime) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td style="vertical-align:top">
-        <div style="font-size:1.1rem; font-weight:bold; color:white;">${c.game}</div>
-        <div style="font-size:0.85rem; color:#aaa; margin-top:4px;">${c.name}</div>
-        <div style="margin-top:8px;">${statusBadge}</div>
+        <div style="font-weight:bold; color:white; font-size:0.95rem;">${c.game}</div>
+        <div style="font-size:0.75rem; color:#888; margin-top:2px; margin-bottom:5px;">${c.name}</div>
+        <div>${statusBadge}</div>
       </td>
       <td style="vertical-align:top">
         ${dropsHtml}
       </td>
-      <td style="vertical-align:top; text-align:right; font-size:1.2rem; font-weight:bold;">
+      <td style="vertical-align:top; text-align:right; font-weight:bold; color:#ddd;">
         ${c.claimed_drops} <span style="font-size:0.8rem; color:#666; font-weight:normal">/ ${c.total_drops}</span>
       </td>
     `;
     ui.campaignsTable.appendChild(tr);
   });
 
+  ui.dropsCounter.textContent = `${visibleCount} kampagnen`;
+
   if (visibleCount === 0) {
       ui.campaignsTable.innerHTML = `<tr><td colspan='3' style='text-align:center; padding:20px; color:#666'>Keine Kampagnen für diesen Filter</td></tr>`;
   }
 
+  // Kanäle
   ui.channelsTable.innerHTML = "";
   (runtime.channels || []).forEach(ch => {
     const tr = document.createElement("tr");
@@ -271,7 +303,7 @@ function updateUptime() {
     ui.uptimeDisplay.innerHTML = `<i class="fa-regular fa-clock"></i> ${hh}:${mm}:${ss}`;
 }
 
-// --- SETTINGS HELPER ---
+// --- SETTINGS ---
 function fillSettings(s) {
   const f = ui.settingsForm;
   f.language.value = s.language ?? "";
@@ -304,27 +336,7 @@ function readSettings() {
   };
 }
 
-// --- POLLING ---
-async function pollSnapshot() {
-  try {
-    const data = await apiCall("/api/snapshot");
-    const isEditing = ui.settingsForm.contains(document.activeElement);
-
-    if (data.settings) {
-        currentPriority = data.settings.priority || [];
-        if (!isEditing) fillSettings(data.settings);
-    }
-    if (data.runtime) {
-      lastRuntime = data.runtime;
-      renderRuntime(data.runtime);
-    }
-  } catch (err) {
-    console.warn("Poll Error:", err);
-  }
-}
-
-// --- INITIALIZE ---
-// 1. UI Bindings
+// --- INIT ---
 ui.startBtn.onclick = () => apiCall("/api/actions/start").then(r => ui.actionStatus.textContent = "Gestartet").catch(e => alert(e));
 ui.stopBtn.onclick = () => apiCall("/api/actions/stop").then(r => ui.actionStatus.textContent = "Gestoppt").catch(e => alert(e));
 ui.reloadBtn.onclick = () => apiCall("/api/actions/reload").then(r => ui.actionStatus.textContent = "Reloading...").catch(e => alert(e));
@@ -342,8 +354,24 @@ ui.settingsForm.onsubmit = async (e) => {
     }
 };
 
-// 2. Start Logic
-applyUrlParams(); // Lese URL bevor das erste Polling startet
+async function pollSnapshot() {
+  try {
+    const data = await apiCall("/api/snapshot");
+    const isEditing = ui.settingsForm.contains(document.activeElement);
+    if (data.settings) {
+        currentPriority = data.settings.priority || [];
+        if (!isEditing) fillSettings(data.settings);
+    }
+    if (data.runtime) {
+      lastRuntime = data.runtime;
+      renderRuntime(data.runtime);
+    }
+  } catch (err) {
+    console.warn("Poll Error:", err);
+  }
+}
+
+applyUrlParams();
 setInterval(pollSnapshot, refreshMs);
 setInterval(updateUptime, 1000);
 pollSnapshot();

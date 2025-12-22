@@ -26,7 +26,8 @@
       </div>
 
       <div class="footer-info">
-        <div id="uptimeDisplay"><i class="fa-regular fa-clock"></i> 00:00:00</div>
+        <div id="uptimeDisplay" title="Laufzeit"><i class="fa-regular fa-clock"></i> 00:00:00</div>
+        <div id="loadDisplay" title="System Load (1min 5min 15min)" style="margin-top:6px; font-family:monospace; color:#888; font-size:0.75rem;">L: -</div>
       </div>
     </nav>
 
@@ -61,19 +62,28 @@
 
         <section class="card full-width">
           <div class="card-header-complex">
-            <h3><i class="fa-solid fa-gift"></i> Drops</h3>
+            <h3>
+                <span><i class="fa-solid fa-gift"></i> Drops</span>
+                <span id="dropsCounter" style="font-size:0.8rem; font-weight:normal; opacity:0.6">0 items</span>
+            </h3>
 
             <div class="filter-toolbar">
                 <div class="search-box">
                     <i class="fa-solid fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Spiel suchen...">
+                    <input type="text" id="searchInput" placeholder="Suchen...">
                 </div>
+
+                <select id="sortSelect" class="sort-select" title="Sortierung">
+                    <option value="priority">Sort: Prio/Status</option>
+                    <option value="progress">Sort: % Fortschritt</option>
+                    <option value="name">Sort: A-Z</option>
+                </select>
 
                 <div class="filter-group">
                     <button class="filter-chip active" data-filter="all">Alle</button>
-                    <button class="filter-chip" data-filter="progressing" title="Haben schon Punkte">Laufend</button>
-                    <button class="filter-chip" data-filter="active" title="Kampagne ist aktiv">Aktiv</button>
-                    <button class="filter-chip" data-filter="claimed" title="Bereits erhalten">Fertig</button>
+                    <button class="filter-chip" data-filter="progressing">Laufend</button>
+                    <button class="filter-chip" data-filter="active">Aktiv</button>
+                    <button class="filter-chip" data-filter="claimed">Fertig</button>
                 </div>
 
                 <label class="prio-toggle" title="Nur Prioritäts-Liste anzeigen">
@@ -87,7 +97,7 @@
             <table id="campaignsTable">
               <thead>
                 <tr>
-                  <th style="width: 25%">Spiel / Kampagne</th>
+                  <th style="width: 30%">Spiel / Kampagne</th>
                   <th>Fortschritt</th>
                   <th style="width: 15%; text-align:right;">Claimed</th>
                 </tr>
@@ -99,8 +109,8 @@
 
         <div class="grid-2 mt-1">
           <section class="card">
-            <div class="card-header">
-              <h3>Gefundene Kanäle</h3>
+            <div class="card-header-complex">
+              <h3>Kanäle</h3>
             </div>
             <div class="table-wrapper">
               <table id="channelsTable">
@@ -117,17 +127,17 @@
           </section>
 
           <section class="card error-card">
-            <div class="card-header">
-              <h3>Events / Fehler</h3>
+             <div class="card-header-complex">
+              <h3>Log</h3>
             </div>
-            <ul id="errorsList" class="scrolling-list"></ul>
+            <ul id="errorsList" class="scrolling-list" style="margin:0; padding-left:1rem; font-size:0.85rem; color:#aaa;"></ul>
           </section>
         </div>
       </div>
 
       <div id="tab-settings" class="tab-content">
         <section class="card">
-          <div class="card-header">
+          <div class="card-header-complex">
             <h3>Konfiguration</h3>
             <span id="settingsStatus" class="status-message"></span>
           </div>
@@ -183,7 +193,7 @@
               </label>
             </div>
 
-            <div class="form-actions right">
+            <div class="form-actions right" style="margin-top:1rem; text-align:right;">
               <button type="submit" class="btn-primary large">Einstellungen speichern</button>
             </div>
           </form>

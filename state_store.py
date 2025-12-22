@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os  # NEU: Import für System-Infos
 from copy import deepcopy
 from datetime import datetime, timezone
 from threading import Lock
@@ -27,6 +28,7 @@ class StateStore:
             "errors": [],
             "pending_switch": None,
             "started_at": self._isoformat(self._started_at),
+            "sys_load": "0.00 0.00 0.00",  # Initialwert
         }
 
     def _settings_payload(self, settings: "Settings") -> dict[str, Any]:
@@ -135,5 +137,18 @@ class StateStore:
     def get_snapshot(self) -> dict[str, Any]:
         with self._lock:
             if "started_at" not in self._runtime:
-                 self._runtime["started_at"] = self._isoformat(self._started_at)
+                self._runtime["started_at"] = self._isoformat(self._started_at)
+
+            # LOAD CALCULATION
+            try:
+                if hasattr(os, "getloadavg"):
+                    # Linux / Mac / Docker
+                    av = os.getloadavg()
+                    self._runtime["sys_load"] = f"{av[0]:.2f} {av[1]:.2f} {av[2]:.2f}"
+                else:
+                    # Windows fallback
+                    self._runtime["sys_load"] = "Win/NA"
+            except:
+                self._runtime["sys_load"] = "-"
+
             return deepcopy({"settings": self._settings, "runtime": self._runtime})
