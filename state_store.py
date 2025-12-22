@@ -17,6 +17,7 @@ class StateStore:
     def __init__(self, settings: "Settings"):
         self._lock = Lock()
         self._settings = self._settings_payload(settings)
+        self._started_at = datetime.now(timezone.utc)
         self._runtime: dict[str, Any] = {
             "state": State.EXIT.name,
             "watching": None,
@@ -25,6 +26,7 @@ class StateStore:
             "last_reload": None,
             "errors": [],
             "pending_switch": None,
+            "started_at": self._isoformat(self._started_at),
         }
 
     def _settings_payload(self, settings: "Settings") -> dict[str, Any]:
@@ -132,4 +134,6 @@ class StateStore:
 
     def get_snapshot(self) -> dict[str, Any]:
         with self._lock:
+            if "started_at" not in self._runtime:
+                 self._runtime["started_at"] = self._isoformat(self._started_at)
             return deepcopy({"settings": self._settings, "runtime": self._runtime})

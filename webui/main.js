@@ -1,312 +1,272 @@
 const refreshMs = 2500;
-const startBtn = document.getElementById("startBtn");
-const stopBtn = document.getElementById("stopBtn");
-const reloadBtn = document.getElementById("reloadBtn");
-const switchBtn = document.getElementById("switchBtn");
-const channelInput = document.getElementById("channelInput");
-const actionStatus = document.getElementById("actionStatus");
-const settingsForm = document.getElementById("settingsForm");
-const settingsStatus = document.getElementById("settingsStatus");
-const stateText = document.getElementById("stateText");
-const statusDot = document.getElementById("statusDot");
-const watchingText = document.getElementById("watchingText");
-const pendingSwitchText = document.getElementById("pendingSwitchText");
-const errorsList = document.getElementById("errorsList");
-const channelsTable = document.querySelector("#channelsTable tbody");
-const campaignsTable = document.querySelector("#campaignsTable tbody");
 
-const tabButtons = document.querySelectorAll('.nav-btn');
-const tabContents = document.querySelectorAll('.tab-content');
+const ui = {
+  startBtn: document.getElementById("startBtn"),
+  stopBtn: document.getElementById("stopBtn"),
+  reloadBtn: document.getElementById("reloadBtn"),
+  actionStatus: document.getElementById("actionStatus"),
+  settingsForm: document.getElementById("settingsForm"),
+  settingsStatus: document.getElementById("settingsStatus"),
+  stateText: document.getElementById("stateText"),
+  statusDot: document.getElementById("statusDot"),
+  watchingText: document.getElementById("watchingText"),
+  pendingSwitchText: document.getElementById("pendingSwitchText"),
+  errorsList: document.getElementById("errorsList"),
+  channelsTable: document.querySelector("#channelsTable tbody"),
+  campaignsTable: document.querySelector("#campaignsTable tbody"),
+  tabButtons: document.querySelectorAll('.nav-btn'),
+  uptimeDisplay: document.getElementById("uptimeDisplay"),
+  filterPriorityBtn: document.getElementById("filterPriorityBtn") // Neu
+};
 
 let pollHandle;
-let settingsDirty = false;
-let lastSettingsEdit = 0;
-const editGraceMs = 5000;
+let startTime = null;
+let lastRuntime = null; // Um sofortiges Neuzeichnen zu ermöglichen
+let currentPriority = []; // Liste der prio spiele
 
-tabButtons.forEach(btn => {
+// --- TABS ---
+ui.tabButtons.forEach(btn => {
   btn.addEventListener('click', () => {
-    tabButtons.forEach(b => b.classList.remove('active'));
-    tabContents.forEach(c => c.classList.remove('active'));
+    ui.tabButtons.forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
     btn.classList.add('active');
-    const tabId = `tab-${btn.dataset.tab}`;
-    document.getElementById(tabId).classList.add('active');
+    document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
   });
 });
 
-function setActionStatus(message, ok = true) {
-  actionStatus.textContent = message || "";
-  actionStatus.style.color = ok ? "#adadb8" : "#ff4f4d";
-  if(message) setTimeout(() => { actionStatus.textContent = ''; }, 3000);
-}
-
-function setSettingsStatus(message, ok = true) {
-  settingsStatus.textContent = message || "";
-  settingsStatus.style.color = ok ? "#00f593" : "#ff4f4d";
-  if(message) setTimeout(() => { settingsStatus.textContent = ''; }, 3000);
-}
-
-async function apiPost(path, payload) {
-  const resp = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: payload ? JSON.stringify(payload) : undefined,
-  });
-  if (!resp.ok) throw new Error(`Request failed: ${resp.status}`);
-  return resp.json();
-}
-
-async function apiGet(path) {
-  const resp = await fetch(path);
-  if (!resp.ok) throw new Error(`Request failed: ${resp.status}`);
-  return resp.json();
-}
-
-async function apiPut(path, payload) {
-  const resp = await fetch(path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const data = await resp.json().catch(() => ({}));
+// --- API ---
+async function apiCall(path, method = "GET", payload = null) {
+  const options = { method, headers: { "Content-Type": "application/json" } };
+  if (payload) options.body = JSON.stringify(payload);
+  const resp = await fetch(path, options);
   if (!resp.ok) {
-    const err = typeof data.error === "string" ? data.error : JSON.stringify(data.error);
-    throw new Error(err || `Request failed: ${resp.status}`);
+    const errData = await resp.json().catch(() => ({}));
+    throw new Error(errData.error || `Error ${resp.status}`);
   }
-  return data;
+  return resp.json();
 }
 
-function serializeSettings(formData) {
-  const toList = (value) => value.split(",").map((v) => v.trim()).filter(Boolean);
-
-  return {
-    language: formData.get("language") || undefined,
-    proxy: formData.get("proxy") || undefined,
-    priority: toList(formData.get("priority") || ""),
-    exclude: toList(formData.get("exclude") || ""),
-    priority_mode: formData.get("priority_mode"),
-    available_drops_check: formData.get("available_drops_check") === "on",
-    enable_badges_emotes: formData.get("enable_badges_emotes") === "on",
-    connection_quality: Number(formData.get("connection_quality")) || 0,
-    tray_notifications: formData.get("tray_notifications") === "on",
-    autostart_tray: formData.get("autostart_tray") === "on",
-  };
-}
-
-function markSettingsDirty() {
-  settingsDirty = true;
-  lastSettingsEdit = Date.now();
-}
-
-function clearSettingsDirty() {
-  settingsDirty = false;
-  lastSettingsEdit = 0;
-}
-
-function fillSettings(settings) {
-  settingsForm.language.value = settings.language ?? "";
-  settingsForm.proxy.value = settings.proxy ?? "";
-  settingsForm.priority.value = (settings.priority || []).join(", ");
-  settingsForm.exclude.value = (settings.exclude || []).join(", ");
-  settingsForm.priority_mode.value = settings.priority_mode || "PRIORITY_ONLY";
-  settingsForm.available_drops_check.checked = Boolean(settings.available_drops_check);
-  settingsForm.enable_badges_emotes.checked = Boolean(settings.enable_badges_emotes);
-  settingsForm.connection_quality.value = settings.connection_quality ?? 0;
-  settingsForm.tray_notifications.checked = Boolean(settings.tray_notifications);
-  settingsForm.autostart_tray.checked = Boolean(settings.autostart_tray);
-  clearSettingsDirty();
-}
-
-function renderChannels(channels = []) {
-  channelsTable.innerHTML = "";
-  if(channels.length === 0) {
-    channelsTable.innerHTML = "<tr><td colspan='7' style='text-align:center'>Keine Kanäle gefunden</td></tr>";
-    return;
-  }
-  channels.forEach((ch) => {
-    const tr = document.createElement("tr");
-
-    let statusColor = '#adadb8';
-    if(ch.status === 'online') statusColor = 'var(--success)';
-    if(ch.status === 'offline') statusColor = '#444';
-
-    tr.innerHTML = `
-      <td style="font-family:monospace; color: #666;">${ch.id ?? "-"}</td>
-      <td><strong>${ch.login ?? "-"}</strong></td>
-      <td>${ch.display_name ?? "-"}</td>
-      <td><span style="color:${statusColor}">● ${ch.status ?? "-"}</span></td>
-      <td>${ch.game ?? "-"}</td>
-      <td>${ch.viewers ?? "-"}</td>
-      <td>${ch.drops_enabled ? "<i class='fa-solid fa-check' style='color:var(--success)'></i>" : "<i class='fa-solid fa-xmark'></i>"}</td>
-    `;
-    channelsTable.appendChild(tr);
-  });
-}
-
-function renderCampaigns(campaigns = []) {
-  campaignsTable.innerHTML = "";
-  if(campaigns.length === 0) {
-    campaignsTable.innerHTML = "<tr><td colspan='6' style='text-align:center'>Keine aktiven Kampagnen</td></tr>";
-    return;
-  }
-
-  campaigns.forEach((c) => {
-    const status = c.active ? "<span style='color:var(--success)'>Aktiv</span>" : c.upcoming ? "Bald" : "Inaktiv";
-    const window = [c.starts_at, c.ends_at].filter(Boolean).map(d => new Date(d).toLocaleDateString()).join(" - ");
-
-    let pct = 0;
-    if(c.total_drops > 0) {
-        pct = Math.round((c.claimed_drops / c.total_drops) * 100);
-    }
-
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${c.name}</td>
-      <td>${c.game}</td>
-      <td>${status}</td>
-      <td>
-        <div style="display:flex; align-items:center; gap:8px;">
-            <div class="progress-container"><div class="progress-fill" style="width:${pct}%"></div></div>
-            <small>${pct}%</small>
-        </div>
-      </td>
-      <td>${c.claimed_drops} / ${c.total_drops}</td>
-      <td style="font-size:0.8rem">${window || "-"}</td>
-    `;
-    campaignsTable.appendChild(tr);
-  });
-}
-
+// --- RENDER ---
 function renderRuntime(runtime) {
-  stateText.textContent = runtime.state || "Unbekannt";
+  ui.stateText.textContent = runtime.state || "Unbekannt";
+  const isWorking = ['MINING', 'WORKING'].includes(runtime.state);
 
-  const parent = document.querySelector('.status-indicator').parentElement;
-  if(runtime.state === 'MINING' || runtime.state === 'WORKING') {
-      parent.classList.add('status-mining');
-      parent.classList.remove('status-stopped');
+  const statusParent = ui.statusDot.parentElement.parentElement;
+  if(isWorking) {
+    statusParent.classList.add('status-mining');
+    statusParent.classList.remove('status-stopped');
   } else {
-      parent.classList.remove('status-mining');
-      parent.classList.add('status-stopped');
+    statusParent.classList.remove('status-mining');
+    statusParent.classList.add('status-stopped');
   }
 
-  const watching = runtime.watching;
-  if (watching) {
-    watchingText.innerHTML = `${watching.display_name || watching.login} <small style='color:var(--accent)'>(${watching.status})</small>`;
+  if (runtime.watching) {
+    ui.watchingText.innerHTML = `${runtime.watching.display_name} <small style='opacity:0.6'>(${runtime.watching.game || '?'})</small>`;
   } else {
-    watchingText.textContent = "Wartet...";
+    ui.watchingText.textContent = "Wartet / Idle";
   }
+  ui.pendingSwitchText.textContent = runtime.pending_switch ? `(Switching to: ${runtime.pending_switch})` : "";
 
-  if(runtime.pending_switch) {
-      pendingSwitchText.textContent = `(Wechsel zu: ${runtime.pending_switch})`;
-  } else {
-      pendingSwitchText.textContent = "";
-  }
-
-  errorsList.innerHTML = "";
+  ui.errorsList.innerHTML = "";
   if(!runtime.errors || runtime.errors.length === 0) {
-      const li = document.createElement("li");
-      li.textContent = "Keine Fehler protokolliert.";
-      li.style.color = "#444";
-      li.style.listStyle = "none";
-      errorsList.appendChild(li);
+      ui.errorsList.innerHTML = "<li style='color:#666; list-style:none'>Keine Fehler (Log sauber)</li>";
   } else {
-    (runtime.errors || []).forEach((err) => {
-        const li = document.createElement("li");
-        li.textContent = err;
-        li.style.color = "var(--danger)";
-        errorsList.appendChild(li);
+    runtime.errors.slice(0, 5).forEach(err => {
+      const li = document.createElement("li");
+      li.textContent = `[ERR] ${err}`;
+      li.style.color = "var(--danger)";
+      ui.errorsList.appendChild(li);
     });
   }
 
-  renderChannels(runtime.channels);
-  renderCampaigns(runtime.campaigns);
-}
-
-async function loadSettings() {
-  try {
-    const settings = await apiGet("/api/settings");
-    fillSettings(settings);
-  } catch (err) {
-    setSettingsStatus(`Laden fehlgeschlagen: ${err.message}`, false);
+  if(runtime.started_at && !startTime) {
+    startTime = new Date(runtime.started_at);
   }
+
+  renderTables(runtime);
 }
 
-async function pollSnapshot() {
-  try {
-    const data = await apiGet("/api/snapshot");
+function renderTables(runtime) {
+  // --- KAMPAGNEN & DROPS ---
+  ui.campaignsTable.innerHTML = "";
 
-    const isUserEditing = settingsForm.contains(document.activeElement);
-    const canRefreshSettings = !settingsDirty || (Date.now() - lastSettingsEdit) >= editGraceMs;
+  // Sortiere aktive Kampagnen nach oben
+  const sortedCampaigns = (runtime.campaigns || []).sort((a, b) => b.active - a.active);
 
-    if (data.settings && !isUserEditing && canRefreshSettings) {
-        fillSettings(data.settings);
+  // Lese Filter Status
+  const filterActive = ui.filterPriorityBtn.checked;
+
+  let visibleCount = 0;
+
+  sortedCampaigns.forEach(c => {
+    // FILTER LOGIK
+    if (filterActive) {
+        // Prüfen, ob das Spiel in der Prio Liste ist (Case-Insensitive)
+        const isPrio = currentPriority.some(p => p.toLowerCase() === c.game.toLowerCase());
+        if (!isPrio) return; // Überspringen
     }
 
-    if (data.runtime) renderRuntime(data.runtime);
+    visibleCount++;
+
+    // HTML Generierung
+    let dropsHtml = '<div class="drops-list">';
+    (c.drops || []).forEach(d => {
+        let pct = 0;
+        if (d.required_minutes > 0) {
+            pct = (d.current_minutes / d.required_minutes) * 100;
+        }
+        if (pct > 100) pct = 100;
+
+        const isClaimed = d.claimed;
+        const barColor = isClaimed ? 'var(--success)' : 'var(--accent)';
+        const statusIcon = isClaimed ? '<i class="fa-solid fa-check"></i>' : '';
+
+        dropsHtml += `
+            <div class="drop-item">
+                <div class="drop-header">
+                    <span class="drop-name">${d.name} ${statusIcon}</span>
+                    <span class="drop-mins">${d.current_minutes} / ${d.required_minutes} min</span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-fill" style="width:${pct}%; background-color: ${barColor}"></div>
+                </div>
+            </div>
+        `;
+    });
+    dropsHtml += '</div>';
+
+    const statusBadge = c.active
+        ? "<span class='badge badge-active'>Aktiv</span>"
+        : "<span class='badge badge-inactive'>Inaktiv</span>";
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td style="vertical-align:top">
+        <div style="font-size:1.1rem; font-weight:bold; color:white;">${c.game}</div>
+        <div style="font-size:0.85rem; color:#aaa; margin-top:4px;">${c.name}</div>
+        <div style="margin-top:8px;">${statusBadge}</div>
+      </td>
+      <td style="vertical-align:top">
+        ${dropsHtml}
+      </td>
+      <td style="vertical-align:top; text-align:right; font-size:1.2rem; font-weight:bold;">
+        ${c.claimed_drops} <span style="font-size:0.8rem; color:#666; font-weight:normal">/ ${c.total_drops}</span>
+      </td>
+    `;
+    ui.campaignsTable.appendChild(tr);
+  });
+
+  if (visibleCount === 0) {
+      const msg = filterActive ? "Keine Prio-Kampagnen aktiv" : "Keine Kampagnen gefunden";
+      ui.campaignsTable.innerHTML = `<tr><td colspan='3' style='text-align:center; padding:20px; color:#666'>${msg}</td></tr>`;
+  }
+
+  // --- KANÄLE ---
+  ui.channelsTable.innerHTML = "";
+  (runtime.channels || []).forEach(ch => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>${ch.login}</strong></td>
+      <td style="color:${ch.status === 'online' ? 'var(--success)' : '#555'}">${ch.status}</td>
+      <td>${ch.drops_enabled ? '✅' : '❌'}</td>
+    `;
+    ui.channelsTable.appendChild(tr);
+  });
+}
+
+function updateUptime() {
+    if(!startTime) return;
+    const now = new Date();
+    const diff = now - startTime;
+
+    const hh = Math.floor(diff / 3600000).toString().padStart(2, '0');
+    const mm = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+    const ss = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+
+    ui.uptimeDisplay.innerHTML = `<i class="fa-regular fa-clock"></i> ${hh}:${mm}:${ss}`;
+}
+
+// --- SETTINGS ---
+function fillSettings(s) {
+  const f = ui.settingsForm;
+  f.language.value = s.language ?? "";
+  f.proxy.value = s.proxy ?? "";
+  f.priority.value = (s.priority || []).join(", ");
+  f.exclude.value = (s.exclude || []).join(", ");
+  f.priority_mode.value = s.priority_mode || "PRIORITY_ONLY";
+  f.connection_quality.value = s.connection_quality ?? 0;
+
+  f.available_drops_check.checked = !!s.available_drops_check;
+  f.enable_badges_emotes.checked = !!s.enable_badges_emotes;
+  f.tray_notifications.checked = !!s.tray_notifications;
+  f.autostart_tray.checked = !!s.autostart_tray;
+}
+
+function readSettings() {
+  const f = new FormData(ui.settingsForm);
+  const list = (k) => f.get(k).split(",").map(x => x.trim()).filter(Boolean);
+
+  return {
+    language: f.get("language"),
+    proxy: f.get("proxy"),
+    priority: list("priority"),
+    exclude: list("exclude"),
+    priority_mode: f.get("priority_mode"),
+    connection_quality: Number(f.get("connection_quality")),
+    available_drops_check: f.get("available_drops_check") === "on",
+    enable_badges_emotes: f.get("enable_badges_emotes") === "on",
+    tray_notifications: f.get("tray_notifications") === "on",
+    autostart_tray: f.get("autostart_tray") === "on",
+  };
+}
+
+// --- POLLING ---
+async function pollSnapshot() {
+  try {
+    const data = await apiCall("/api/snapshot");
+    const isEditing = ui.settingsForm.contains(document.activeElement);
+
+    if (data.settings) {
+        // Prio Liste aktualisieren
+        currentPriority = data.settings.priority || [];
+
+        if (!isEditing) {
+            fillSettings(data.settings);
+        }
+    }
+
+    if (data.runtime) {
+      lastRuntime = data.runtime;
+      renderRuntime(data.runtime);
+    }
   } catch (err) {
-    console.error("Snapshot failed:", err);
+    console.warn("Poll Error:", err);
   }
 }
 
-function startPolling() {
-  if (pollHandle) clearInterval(pollHandle);
-  pollHandle = setInterval(pollSnapshot, refreshMs);
-  pollSnapshot();
-}
+ui.startBtn.onclick = () => apiCall("/api/actions/start").then(r => ui.actionStatus.textContent = "Gestartet").catch(e => alert(e));
+ui.stopBtn.onclick = () => apiCall("/api/actions/stop").then(r => ui.actionStatus.textContent = "Gestoppt").catch(e => alert(e));
+ui.reloadBtn.onclick = () => apiCall("/api/actions/reload").then(r => ui.actionStatus.textContent = "Reloading...").catch(e => alert(e));
 
-["input", "change", "blur"].forEach((evt) => {
-  settingsForm.addEventListener(evt, (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
-    if (!settingsForm.contains(target)) return;
-    markSettingsDirty();
-  });
-});
+ui.filterPriorityBtn.onchange = () => {
+    if(lastRuntime) renderTables(lastRuntime);
+};
 
-startBtn.addEventListener("click", async () => {
-  try {
-    const res = await apiPost("/api/actions/start");
-    setActionStatus(`Start: ${res.status}`);
-  } catch (err) { setActionStatus(err.message, false); }
-});
+ui.settingsForm.onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+        await apiCall("/api/settings", "PUT", readSettings());
+        ui.settingsStatus.textContent = "Gespeichert!";
+        ui.settingsStatus.style.color = "var(--success)";
+        setTimeout(() => ui.settingsStatus.textContent = "", 3000);
+    } catch(err) {
+        ui.settingsStatus.textContent = "Fehler!";
+        ui.settingsStatus.style.color = "var(--danger)";
+    }
+};
 
-stopBtn.addEventListener("click", async () => {
-  try {
-    const res = await apiPost("/api/actions/stop");
-    setActionStatus(`Stop: ${res.status}`);
-  } catch (err) { setActionStatus(err.message, false); }
-});
-
-reloadBtn.addEventListener("click", async () => {
-  try {
-    const res = await apiPost("/api/actions/reload");
-    setActionStatus(`Reload: ${res.status}`);
-  } catch (err) { setActionStatus(err.message, false); }
-});
-
-switchBtn.addEventListener("click", async () => {
-  const value = channelInput.value.trim();
-  const payload = { channel: value === "" ? null : isNaN(Number(value)) ? value : Number(value) };
-  try {
-    const res = await apiPost("/api/actions/switch-channel", payload);
-    setActionStatus(`Switch: ${res.status} (${res.channel ?? "auto"})`);
-  } catch (err) { setActionStatus(err.message, false); }
-});
-
-settingsForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const payload = serializeSettings(new FormData(settingsForm));
-  try {
-    await apiPut("/api/settings", payload);
-    clearSettingsDirty();
-    setSettingsStatus("Einstellungen gespeichert!");
-  } catch (err) { setSettingsStatus(`Fehler: ${err.message}`, false); }
-});
-
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) clearInterval(pollHandle);
-  else startPolling();
-});
-
-loadSettings();
-startPolling();
+// Start
+setInterval(pollSnapshot, refreshMs);
+setInterval(updateUptime, 1000);
+pollSnapshot();
