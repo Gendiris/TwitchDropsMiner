@@ -1,5 +1,3 @@
-const refreshMs = 2500;
-
 const ui = {
   startBtn: document.getElementById("startBtn"),
   stopBtn: document.getElementById("stopBtn"),
@@ -264,6 +262,6 @@ async function pollSnapshot() {
 }
 
 applyUrlParams();
-setInterval(pollSnapshot, refreshMs);
+setInterval(pollSnapshot, 500);
 setInterval(updateUptime, 1000);
 pollSnapshot();
