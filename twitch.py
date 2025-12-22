@@ -93,6 +93,7 @@ class _AuthState:
         self.session_id: str
         self.access_token: str
         self.client_version: str
+        self._session_expires_at: datetime | None = None
 
     def _hasattrs(self, *attrs: str) -> bool:
         return all(hasattr(self, attr) for attr in attrs)
@@ -109,6 +110,7 @@ class _AuthState:
             "session_id",
             "access_token",
             "client_version",
+            "_session_expires_at",
         )
         self._logged_in.clear()
 
@@ -362,12 +364,21 @@ class _AuthState:
         client_info: ClientInfo = self._twitch._client_type
         cookie = jar.filter_cookies(client_info.CLIENT_URL)
 
-        if "auth-token" not in cookie:
+        if (auth_cookie := cookie.get("auth-token")) is None:
             raise AuthMissingCookies()
 
         if not hasattr(self, "access_token"):
             logger.info("Restoring session from cookie")
-            self.access_token = cookie["auth-token"].value
+            self.access_token = auth_cookie.value
+
+        now = datetime.now(timezone.utc)
+        if (
+            self._logged_in.is_set()
+            and self._hasattrs("access_token", "user_id", "device_id")
+            and self._session_expires_at is not None
+            and self._session_expires_at > now
+        ):
+            return
 
         if not self._hasattrs("device_id"):
             async with self._twitch.request(
@@ -394,6 +405,10 @@ class _AuthState:
                 raise AuthMissingCookies()
             validate_response = await response.json()
 
+        expires_in = validate_response.get("expires_in")
+        if isinstance(expires_in, int):
+            self._session_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+
         if validate_response["client_id"] != client_info.CLIENT_ID:
             logger.info("Cookie client ID mismatch")
             raise AuthMissingCookies()
@@ -407,7 +422,8 @@ class _AuthState:
         self._logged_in.set()
 
     def invalidate(self):
-        self._delattrs("access_token")
+        self._delattrs("access_token", "user_id", "_session_expires_at")
+        self._logged_in.clear()
 
 
 class Twitch:
