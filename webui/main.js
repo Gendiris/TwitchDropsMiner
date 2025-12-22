@@ -31,6 +31,7 @@ let filterMode = 'all';
 let filterSearch = '';
 let sortMode = 'priority';
 
+// --- API ---
 async function apiCall(path, method = "GET", payload = null) {
   const options = { method, headers: { "Content-Type": "application/json" } };
   if (payload) options.body = JSON.stringify(payload);
@@ -42,6 +43,7 @@ async function apiCall(path, method = "GET", payload = null) {
   return resp.json();
 }
 
+// --- URL HANDLING ---
 function applyUrlParams() {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab');
@@ -50,7 +52,8 @@ function applyUrlParams() {
         if (btn) btn.click();
     }
     const searchParam = params.get('search');
-    if (searchParam) { ui.searchInput.value = searchParam; filterSearch = searchParam.toLowerCase(); }
+    if (searchParam && ui.searchInput) { ui.searchInput.value = searchParam; filterSearch = searchParam.toLowerCase(); }
+
     const filterParam = params.get('filter');
     if (filterParam) {
         const chip = document.querySelector(`.filter-chip[data-filter="${filterParam}"]`);
@@ -60,8 +63,8 @@ function applyUrlParams() {
             filterMode = filterParam;
         }
     }
-    if (params.get('sort')) { ui.sortSelect.value = params.get('sort'); sortMode = params.get('sort'); }
-    if (params.get('prio') === 'true') ui.filterPriorityBtn.checked = true;
+    if (params.get('sort') && ui.sortSelect) { ui.sortSelect.value = params.get('sort'); sortMode = params.get('sort'); }
+    if (params.get('prio') === 'true' && ui.filterPriorityBtn) ui.filterPriorityBtn.checked = true;
 }
 
 function updateUrl() {
@@ -71,30 +74,37 @@ function updateUrl() {
     if(filterSearch) params.set('search', filterSearch);
     if(filterMode !== 'all') params.set('filter', filterMode);
     if(sortMode !== 'priority') params.set('sort', sortMode);
-    if(ui.filterPriorityBtn.checked) params.set('prio', 'true');
+    if(ui.filterPriorityBtn && ui.filterPriorityBtn.checked) params.set('prio', 'true');
     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
 }
 
+// --- RENDER FUNCTIONS ---
 function renderRuntime(runtime) {
-  ui.stateText.textContent = runtime.state || "Unbekannt";
+  if (ui.stateText) ui.stateText.textContent = runtime.state || "Unbekannt";
   const isWorking = ['MINING', 'WORKING'].includes(runtime.state);
 
-  const statusParent = ui.statusDot.parentElement.parentElement;
-  if(isWorking) {
-    statusParent.classList.add('status-mining');
-    statusParent.classList.remove('status-stopped');
-  } else {
-    statusParent.classList.remove('status-mining');
-    statusParent.classList.add('status-stopped');
+  if (ui.statusDot) {
+      const statusParent = ui.statusDot.parentElement.parentElement;
+      if(isWorking) {
+        statusParent.classList.add('status-mining');
+        statusParent.classList.remove('status-stopped');
+      } else {
+        statusParent.classList.remove('status-mining');
+        statusParent.classList.add('status-stopped');
+      }
   }
 
-  if (runtime.watching) {
-    ui.watchingText.innerHTML = `${runtime.watching.display_name} <small style='opacity:0.6'>(${runtime.watching.game || '?'})</small>`;
-  } else {
-    ui.watchingText.textContent = "Wartet / Idle";
+  if (ui.watchingText) {
+      if (runtime.watching) {
+        ui.watchingText.innerHTML = `${runtime.watching.display_name} <small style='opacity:0.6'>(${runtime.watching.game || '?'})</small>`;
+      } else {
+        ui.watchingText.textContent = "Wartet / Idle";
+      }
   }
 
-  ui.pendingSwitchText.textContent = runtime.pending_switch ? `(Wechselt zu: ${runtime.pending_switch})` : "";
+  if (ui.pendingSwitchText) {
+    ui.pendingSwitchText.textContent = runtime.pending_switch ? `(Wechselt zu: ${runtime.pending_switch})` : "";
+  }
 
   renderTimeline(runtime.journal || []);
 
@@ -138,10 +148,12 @@ function getCampaignProgress(c) {
 }
 
 function renderTables(runtime) {
+  if (!ui.campaignsTable) return;
   ui.campaignsTable.innerHTML = "";
   let campaigns = [...(runtime.campaigns || [])];
 
   campaigns.sort((a, b) => {
+      // Sortierung nach "Zuletzt gesehen"
       if (sortMode === 'last_seen') {
           const tA = a.last_seen ? new Date(a.last_seen).getTime() : 0;
           const tB = b.last_seen ? new Date(b.last_seen).getTime() : 0;
@@ -155,7 +167,7 @@ function renderTables(runtime) {
   let visibleCount = 0;
   campaigns.forEach(c => {
     if (filterSearch && !c.game.toLowerCase().includes(filterSearch) && !c.name.toLowerCase().includes(filterSearch)) return;
-    if (ui.filterPriorityBtn.checked) {
+    if (ui.filterPriorityBtn && ui.filterPriorityBtn.checked) {
         if (!currentPriority.some(p => p.toLowerCase() === c.game.toLowerCase())) return;
     }
     if (filterMode === 'active' && !c.active) return;
@@ -178,21 +190,34 @@ function renderTables(runtime) {
     });
     dropsHtml += '</div>';
 
+    // Optional: Anzeige "Zuletzt gesehen" wenn sortiert
+    let timeInfo = "";
+    if (sortMode === 'last_seen' && c.last_seen) {
+        timeInfo = `<div style="font-size:0.7rem; color:var(--accent); margin-top:2px;"><i class="fa-solid fa-eye"></i> ${new Date(c.last_seen).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
+    }
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><div style="font-weight:bold;">${c.game}</div><div style="font-size:0.75rem;color:#888;">${c.name}</div></td>
+      <td>
+        <div style="font-weight:bold;">${c.game}</div>
+        <div style="font-size:0.75rem;color:#888;">${c.name}</div>
+        ${timeInfo}
+      </td>
       <td>${dropsHtml}</td>
       <td style="text-align:right;">${c.claimed_drops}/${c.total_drops}</td>`;
     ui.campaignsTable.appendChild(tr);
   });
-  ui.dropsCounter.textContent = visibleCount;
 
-  ui.channelsTable.innerHTML = "";
-  (runtime.channels || []).forEach(ch => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${ch.login}</td><td style="color:${ch.status === 'online' ? 'var(--success)' : '#555'}">${ch.status}</td><td>${ch.drops_enabled ? '✅' : '❌'}</td>`;
-    ui.channelsTable.appendChild(tr);
-  });
+  if (ui.dropsCounter) ui.dropsCounter.textContent = visibleCount;
+
+  if (ui.channelsTable) {
+    ui.channelsTable.innerHTML = "";
+    (runtime.channels || []).forEach(ch => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${ch.login}</td><td style="color:${ch.status === 'online' ? 'var(--success)' : '#555'}">${ch.status}</td><td>${ch.drops_enabled ? '✅' : '❌'}</td>`;
+        ui.channelsTable.appendChild(tr);
+    });
+  }
 }
 
 function updateUptime() {
@@ -205,6 +230,7 @@ function updateUptime() {
     ui.uptimeDisplay.innerHTML = `<i class="fa-regular fa-clock"></i> ${hh}:${mm}:${ss}`;
 }
 
+// --- EVENTS (Mit Null-Checks) ---
 ui.tabButtons.forEach(btn => btn.onclick = () => {
     ui.tabButtons.forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -220,15 +246,15 @@ ui.filterChips.forEach(chip => chip.onclick = () => {
     updateUrl(); if(lastRuntime) renderTables(lastRuntime);
 });
 
-ui.searchInput.oninput = (e) => { filterSearch = e.target.value.toLowerCase(); updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
-ui.filterPriorityBtn.onchange = () => { updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
-ui.sortSelect.onchange = (e) => { sortMode = e.target.value; updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
+if (ui.searchInput) ui.searchInput.oninput = (e) => { filterSearch = e.target.value.toLowerCase(); updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
+if (ui.filterPriorityBtn) ui.filterPriorityBtn.onchange = () => { updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
+if (ui.sortSelect) ui.sortSelect.onchange = (e) => { sortMode = e.target.value; updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
 
-ui.startBtn.onclick = () => apiCall("/api/actions/start");
-ui.stopBtn.onclick = () => apiCall("/api/actions/stop");
-ui.reloadBtn.onclick = () => apiCall("/api/actions/reload");
+if (ui.startBtn) ui.startBtn.onclick = () => apiCall("/api/actions/start");
+if (ui.stopBtn) ui.stopBtn.onclick = () => apiCall("/api/actions/stop");
+if (ui.reloadBtn) ui.reloadBtn.onclick = () => apiCall("/api/actions/reload");
 
-ui.settingsForm.onsubmit = async (e) => {
+if (ui.settingsForm) ui.settingsForm.onsubmit = async (e) => {
     e.preventDefault();
     const f = new FormData(ui.settingsForm);
     const payload = {
@@ -243,15 +269,17 @@ ui.settingsForm.onsubmit = async (e) => {
     };
     try {
         await apiCall("/api/settings", "PUT", payload);
-        ui.settingsStatus.textContent = "Gespeichert!";
-        setTimeout(() => ui.settingsStatus.textContent = "", 3000);
+        if (ui.settingsStatus) {
+            ui.settingsStatus.textContent = "Gespeichert!";
+            setTimeout(() => ui.settingsStatus.textContent = "", 3000);
+        }
     } catch(err) { alert(err.message); }
 };
 
 async function pollSnapshot() {
   try {
     const data = await apiCall("/api/snapshot");
-    if (data.settings && !ui.settingsForm.contains(document.activeElement)) {
+    if (data.settings && ui.settingsForm && !ui.settingsForm.contains(document.activeElement)) {
         currentPriority = data.settings.priority || [];
         const s = data.settings; const f = ui.settingsForm;
         f.language.value = s.language; f.proxy.value = s.proxy;

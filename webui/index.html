@@ -13,7 +13,7 @@
     <nav class="sidebar">
       <div class="brand">
         <i class="fa-brands fa-twitch"></i>
-        <span>TDM 2.0</span>
+        <span>Drops Miner</span>
       </div>
 
       <div class="nav-links">
@@ -54,6 +54,7 @@
 
           <div class="main-controls">
             <button id="startBtn" class="btn-primary" title="Start"><i class="fa-solid fa-play"></i></button>
+            <button id="stopBtn" class="btn-danger" title="Stop"><i class="fa-solid fa-stop"></i></button>
             <button id="reloadBtn" class="btn-secondary" title="Reload"><i class="fa-solid fa-rotate-right"></i></button>
           </div>
           <div id="actionStatus" class="status-message"></div>
@@ -67,20 +68,14 @@
             </h3>
 
             <div class="filter-toolbar">
-                <div class="search-prio-group">
-                    <div class="search-box">
-                        <i class="fa-solid fa-search"></i>
-                        <input type="text" id="searchInput" placeholder="Suche...">
-                    </div>
-
-                    <label class="prio-toggle" title="Nur Prio">
-                        <input type="checkbox" id="filterPriorityBtn">
-                        <span>★</span>
-                    </label>
+                <div class="search-box">
+                    <i class="fa-solid fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="Suche...">
                 </div>
 
                 <select id="sortSelect" class="sort-select">
                     <option value="priority">Prio</option>
+                    <option value="last_seen">Zuletzt gesehen</option>
                     <option value="progress">%</option>
                     <option value="name">A-Z</option>
                 </select>
@@ -90,6 +85,11 @@
                     <button class="filter-chip" data-filter="progressing">Laufend</button>
                     <button class="filter-chip" data-filter="active">Aktiv</button>
                 </div>
+
+                <label class="prio-toggle" title="Nur Prio">
+                    <input type="checkbox" id="filterPriorityBtn">
+                    <span>★</span>
+                </label>
             </div>
           </div>
 
