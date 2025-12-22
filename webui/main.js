@@ -274,7 +274,7 @@ function renderTables(runtime) {
     ui.campaignsTable.appendChild(tr);
   });
 
-  ui.dropsCounter.textContent = `${visibleCount} kampagnen`;
+  ui.dropsCounter.textContent = `${visibleCount} Kampagnen`;
 
   if (visibleCount === 0) {
       ui.campaignsTable.innerHTML = `<tr><td colspan='3' style='text-align:center; padding:20px; color:#666'>Keine Kampagnen für diesen Filter</td></tr>`;

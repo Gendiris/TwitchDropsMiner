@@ -17,17 +17,17 @@
       </div>
 
       <div class="nav-links">
-        <button class="nav-btn active" data-tab="dashboard">
-          <i class="fa-solid fa-chart-line"></i> Dashboard
+        <button class="nav-btn active" data-tab="dashboard" title="Dashboard">
+          <i class="fa-solid fa-chart-line"></i> <span>Dashboard</span>
         </button>
-        <button class="nav-btn" data-tab="settings">
-          <i class="fa-solid fa-sliders"></i> Einstellungen
+        <button class="nav-btn" data-tab="settings" title="Einstellungen">
+          <i class="fa-solid fa-gear"></i> <span>Settings</span>
         </button>
       </div>
 
       <div class="footer-info">
-        <div id="uptimeDisplay" title="Laufzeit"><i class="fa-regular fa-clock"></i> 00:00:00</div>
-        <div id="loadDisplay" title="System Load (1min 5min 15min)" style="margin-top:6px; font-family:monospace; color:#888; font-size:0.75rem;">L: -</div>
+        <div id="uptimeDisplay" title="Laufzeit"><i class="fa-regular fa-clock"></i> 00:00</div>
+        <div id="loadDisplay" title="System Load" style="margin-top:6px; font-family:monospace; color:#888; font-size:0.75rem;">L: -</div>
       </div>
     </nav>
 
@@ -38,7 +38,7 @@
         <section class="hero-card">
           <div class="status-indicator">
             <span class="pulse-dot" id="statusDot"></span>
-            <h2 id="stateText">Initialisiere...</h2>
+            <h2 id="stateText">Status</h2>
           </div>
 
           <div class="current-watch">
@@ -46,16 +46,16 @@
               <i class="fa-solid fa-tv"></i>
             </div>
             <div class="watch-info">
-              <span class="label">Aktuell geschaut:</span>
+              <span class="label">Watch</span>
               <strong id="watchingText">-</strong>
               <span id="pendingSwitchText" class="sub-text"></span>
             </div>
           </div>
 
           <div class="main-controls">
-            <button id="startBtn" class="btn-primary" title="Start Mining"><i class="fa-solid fa-play"></i></button>
-            <button id="stopBtn" class="btn-danger" title="Stop Mining"><i class="fa-solid fa-stop"></i></button>
-            <button id="reloadBtn" class="btn-secondary" title="Reload Config"><i class="fa-solid fa-rotate-right"></i></button>
+            <button id="startBtn" class="btn-primary" title="Start"><i class="fa-solid fa-play"></i></button>
+            <button id="stopBtn" class="btn-danger" title="Stop"><i class="fa-solid fa-stop"></i></button>
+            <button id="reloadBtn" class="btn-secondary" title="Reload"><i class="fa-solid fa-rotate-right"></i></button>
           </div>
           <div id="actionStatus" class="status-message"></div>
         </section>
@@ -63,32 +63,31 @@
         <section class="card full-width">
           <div class="card-header-complex">
             <h3>
-                <span><i class="fa-solid fa-gift"></i> Drops</span>
-                <span id="dropsCounter" style="font-size:0.8rem; font-weight:normal; opacity:0.6">0 items</span>
+                <span>Drops</span>
+                <span id="dropsCounter" style="font-size:0.8rem; font-weight:normal; opacity:0.6">0</span>
             </h3>
 
             <div class="filter-toolbar">
                 <div class="search-box">
                     <i class="fa-solid fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Suchen...">
+                    <input type="text" id="searchInput" placeholder="Suche...">
                 </div>
 
-                <select id="sortSelect" class="sort-select" title="Sortierung">
-                    <option value="priority">Sort: Prio/Status</option>
-                    <option value="progress">Sort: % Fortschritt</option>
-                    <option value="name">Sort: A-Z</option>
+                <select id="sortSelect" class="sort-select">
+                    <option value="priority">Prio</option>
+                    <option value="progress">%</option>
+                    <option value="name">A-Z</option>
                 </select>
 
                 <div class="filter-group">
                     <button class="filter-chip active" data-filter="all">Alle</button>
                     <button class="filter-chip" data-filter="progressing">Laufend</button>
                     <button class="filter-chip" data-filter="active">Aktiv</button>
-                    <button class="filter-chip" data-filter="claimed">Fertig</button>
                 </div>
 
-                <label class="prio-toggle" title="Nur Prioritäts-Liste anzeigen">
+                <label class="prio-toggle" title="Nur Prio">
                     <input type="checkbox" id="filterPriorityBtn">
-                    <span>★ Prio</span>
+                    <span>★</span>
                 </label>
             </div>
           </div>
@@ -97,9 +96,9 @@
             <table id="campaignsTable">
               <thead>
                 <tr>
-                  <th style="width: 30%">Spiel / Kampagne</th>
-                  <th>Fortschritt</th>
-                  <th style="width: 15%; text-align:right;">Claimed</th>
+                  <th style="width: 35%">Game</th>
+                  <th>Progress</th>
+                  <th style="width: 60px; text-align:right;">Clm</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -145,7 +144,7 @@
           <form id="settingsForm">
             <div class="form-grid">
               <div class="form-group">
-                <label>Priorität (Spiele)</label>
+                <label>Priorität</label>
                 <input type="text" name="priority" placeholder="Rust, CSGO...">
               </div>
               <div class="form-group">
@@ -153,7 +152,7 @@
                 <input type="text" name="exclude">
               </div>
               <div class="form-group">
-                <label>Prioritäts-Modus</label>
+                <label>Modus</label>
                 <select name="priority_mode">
                   <option value="PRIORITY_ONLY">Nur Priorität</option>
                   <option value="ENDING_SOONEST">Endet bald</option>
@@ -161,7 +160,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label>Proxy URL</label>
+                <label>Proxy</label>
                 <input type="text" name="proxy" placeholder="http://user:pass@host:port">
               </div>
               <div class="form-group">
@@ -169,7 +168,7 @@
                 <input type="text" name="language" placeholder="en, de">
               </div>
                <div class="form-group">
-                <label>Qualität (0-5)</label>
+                <label>Qualität</label>
                 <input type="number" name="connection_quality" min="0" max="5">
               </div>
             </div>
@@ -177,24 +176,24 @@
             <div class="toggles-grid">
               <label class="toggle-card">
                 <input type="checkbox" name="available_drops_check">
-                <span>Check Available Drops</span>
+                <span>Check Avbl.</span>
               </label>
               <label class="toggle-card">
                 <input type="checkbox" name="enable_badges_emotes">
-                <span>Farm Badges/Emotes</span>
+                <span>Farm Badges</span>
               </label>
               <label class="toggle-card">
                 <input type="checkbox" name="tray_notifications">
-                <span>Tray Benachrichtigungen</span>
+                <span>Tray Notif.</span>
               </label>
               <label class="toggle-card">
                 <input type="checkbox" name="autostart_tray">
-                <span>Autostart Tray</span>
+                <span>Autostart</span>
               </label>
             </div>
 
             <div class="form-actions right" style="margin-top:1rem; text-align:right;">
-              <button type="submit" class="btn-primary large">Einstellungen speichern</button>
+              <button type="submit" class="btn-primary large">Speichern</button>
             </div>
           </form>
         </section>
