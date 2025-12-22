@@ -26,6 +26,8 @@ class StateStore:
         self._first_campaign_load = True
         self._journal_file = "journal.json"
 
+        self._game_last_seen: dict[str, datetime] = {}
+
         self._runtime: dict[str, Any] = {
             "state": State.EXIT.name,
             "watching": None,
@@ -45,7 +47,6 @@ class StateStore:
         try:
             with open(self._journal_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # Bekannte Claims aus dem Journal ins Set laden
                 for entry in data:
                     if entry.get("type") == "claim":
                         self._known_claims.add(entry.get("msg"))
@@ -104,6 +105,38 @@ class StateStore:
             "drops_enabled": channel.drops_enabled,
         }
 
+    @classmethod
+    def _drop_payload(cls, drop: "TimedDrop") -> dict[str, Any]:
+        return {
+            "id": drop.id,
+            "name": drop.name,
+            "progress": drop.progress,
+            "claimed": drop.is_claimed,
+            "can_claim": drop.can_claim,
+            "current_minutes": drop.current_minutes,
+            "required_minutes": drop.required_minutes,
+            "starts_at": cls._isoformat(drop.starts_at),
+            "ends_at": cls._isoformat(drop.ends_at),
+        }
+
+    def _campaign_payload(self, campaign: "DropsCampaign") -> dict[str, Any]:
+        last_seen_dt = self._game_last_seen.get(campaign.game.name)
+        return {
+            "id": campaign.id,
+            "name": campaign.name,
+            "game": campaign.game.name,
+            "eligible": campaign.eligible,
+            "active": campaign.active,
+            "upcoming": campaign.upcoming,
+            "progress": campaign.progress,
+            "claimed_drops": campaign.claimed_drops,
+            "total_drops": campaign.total_drops,
+            "starts_at": self._isoformat(campaign.starts_at),
+            "ends_at": self._isoformat(campaign.ends_at),
+            "last_seen": self._isoformat(last_seen_dt),
+            "drops": [self._drop_payload(drop) for drop in campaign.drops],
+        }
+
     def set_state(self, state: State) -> None:
         with self._lock:
             self._runtime["state"] = state.name
@@ -111,6 +144,7 @@ class StateStore:
     def set_watching(self, channel: "Channel" | None) -> None:
         with self._lock:
             current_login = channel._login if channel else None
+
             if current_login != self._last_watching_login:
                 if current_login:
                     self._add_journal_entry("switch",
@@ -119,6 +153,10 @@ class StateStore:
                 else:
                     self._add_journal_entry("info", "Stream gestoppt / Suche...", "fa-pause")
                 self._last_watching_login = current_login
+
+            if channel and channel.game:
+                self._game_last_seen[channel.game.name] = datetime.now(timezone.utc)
+
             self._runtime["watching"] = self._channel_payload(channel)
 
     def set_channels(self, channels: Iterable["Channel"]) -> None:
@@ -129,29 +167,25 @@ class StateStore:
         with self._lock:
             payload_list = []
             for c in campaigns:
-                c_payload = {
-                    "id": c.id, "name": c.name, "game": c.game.name, "active": c.active,
-                    "claimed_drops": c.claimed_drops, "total_drops": c.total_drops,
-                    "drops": []
-                }
-                for d in c.drops:
-                    dp = {
-                        "id": d.id, "name": d.name, "claimed": d.is_claimed,
-                        "current_minutes": d.current_minutes, "required_minutes": d.required_minutes
-                    }
-                    c_payload["drops"].append(dp)
+                payload_list.append(self._campaign_payload(c))
 
-                    claim_key = f"DROP ERHALTEN: {d.name} ({c.game.name})"
-                    if d.is_claimed and claim_key not in self._known_claims:
-                        if not self._first_campaign_load:
+                if not self._first_campaign_load:
+                    for d in c.drops:
+                        claim_key = f"DROP ERHALTEN: {d.name} ({c.game.name})"
+                        if d.is_claimed and claim_key not in self._known_claims:
                             self._add_journal_entry("claim", claim_key, "fa-gift")
-                        self._known_claims.add(claim_key)
-                payload_list.append(c_payload)
+                            self._known_claims.add(claim_key)
+                        elif d.is_claimed:
+                            self._known_claims.add(claim_key)
+                else:
+                    for d in c.drops:
+                        claim_key = f"DROP ERHALTEN: {d.name} ({c.game.name})"
+                        if d.is_claimed:
+                            self._known_claims.add(claim_key)
 
             self._first_campaign_load = False
             self._runtime["campaigns"] = payload_list
 
-    # DIESE METHODE HAT GEFEHLT:
     def set_last_reload(self, when: datetime | None = None) -> None:
         with self._lock:
             self._runtime["last_reload"] = self._isoformat(when or datetime.now(timezone.utc))
@@ -164,14 +198,23 @@ class StateStore:
         with self._lock:
             self._add_journal_entry("error", message, "fa-exclamation-triangle")
 
+            errors: list[str] = self._runtime["errors"]
+            errors.append(message)
+            self._runtime["errors"] = errors[-10:]
+
     def get_snapshot(self) -> dict[str, Any]:
         with self._lock:
+            if "started_at" not in self._runtime:
+                self._runtime["started_at"] = self._isoformat(self._started_at)
             try:
                 if hasattr(os, "getloadavg"):
                     av = os.getloadavg()
                     self._runtime["sys_load"] = f"{av[0]:.2f} {av[1]:.2f} {av[2]:.2f}"
+                else:
+                    self._runtime["sys_load"] = "Win/NA"
             except:
-                pass
+                self._runtime["sys_load"] = "-"
+
             return deepcopy({"settings": self._settings, "runtime": self._runtime})
 
     def update_settings(self, settings: "Settings") -> None:

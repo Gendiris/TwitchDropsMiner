@@ -1,5 +1,8 @@
+const refreshMs = 1000;
+
 const ui = {
   startBtn: document.getElementById("startBtn"),
+  stopBtn: document.getElementById("stopBtn"),
   reloadBtn: document.getElementById("reloadBtn"),
   actionStatus: document.getElementById("actionStatus"),
   settingsForm: document.getElementById("settingsForm"),
@@ -28,7 +31,6 @@ let filterMode = 'all';
 let filterSearch = '';
 let sortMode = 'priority';
 
-// --- API ---
 async function apiCall(path, method = "GET", payload = null) {
   const options = { method, headers: { "Content-Type": "application/json" } };
   if (payload) options.body = JSON.stringify(payload);
@@ -40,7 +42,6 @@ async function apiCall(path, method = "GET", payload = null) {
   return resp.json();
 }
 
-// --- URL HANDLING ---
 function applyUrlParams() {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab');
@@ -74,7 +75,6 @@ function updateUrl() {
     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
 }
 
-// --- RENDER FUNCTIONS ---
 function renderRuntime(runtime) {
   ui.stateText.textContent = runtime.state || "Unbekannt";
   const isWorking = ['MINING', 'WORKING'].includes(runtime.state);
@@ -142,6 +142,11 @@ function renderTables(runtime) {
   let campaigns = [...(runtime.campaigns || [])];
 
   campaigns.sort((a, b) => {
+      if (sortMode === 'last_seen') {
+          const tA = a.last_seen ? new Date(a.last_seen).getTime() : 0;
+          const tB = b.last_seen ? new Date(b.last_seen).getTime() : 0;
+          return (tB - tA) || a.game.localeCompare(b.game);
+      }
       if (sortMode === 'name') return a.game.localeCompare(b.game);
       if (sortMode === 'progress') return getCampaignProgress(b) - getCampaignProgress(a);
       return (b.active - a.active) || a.game.localeCompare(b.game);
@@ -200,7 +205,6 @@ function updateUptime() {
     ui.uptimeDisplay.innerHTML = `<i class="fa-regular fa-clock"></i> ${hh}:${mm}:${ss}`;
 }
 
-// --- EVENTS ---
 ui.tabButtons.forEach(btn => btn.onclick = () => {
     ui.tabButtons.forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -221,6 +225,7 @@ ui.filterPriorityBtn.onchange = () => { updateUrl(); if(lastRuntime) renderTable
 ui.sortSelect.onchange = (e) => { sortMode = e.target.value; updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
 
 ui.startBtn.onclick = () => apiCall("/api/actions/start");
+ui.stopBtn.onclick = () => apiCall("/api/actions/stop");
 ui.reloadBtn.onclick = () => apiCall("/api/actions/reload");
 
 ui.settingsForm.onsubmit = async (e) => {
@@ -260,6 +265,6 @@ async function pollSnapshot() {
 }
 
 applyUrlParams();
-setInterval(pollSnapshot, 1000);
+setInterval(pollSnapshot, refreshMs);
 setInterval(updateUptime, 1000);
 pollSnapshot();
