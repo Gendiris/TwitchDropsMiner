@@ -1,290 +1,249 @@
-const refreshMs = 1000;
-
-const ui = {
-  startBtn: document.getElementById("startBtn"),
-  reloadBtn: document.getElementById("reloadBtn"),
-  actionStatus: document.getElementById("actionStatus"),
-  settingsForm: document.getElementById("settingsForm"),
-  settingsStatus: document.getElementById("settingsStatus"),
-  stateText: document.getElementById("stateText"),
-  statusDot: document.getElementById("statusDot"),
-  watchingText: document.getElementById("watchingText"),
-  pendingSwitchText: document.getElementById("pendingSwitchText"),
-  timelineList: document.getElementById("timelineList"),
-  channelsTable: document.querySelector("#channelsTable tbody"),
-  campaignsTable: document.querySelector("#campaignsTable tbody"),
-  tabButtons: document.querySelectorAll('.nav-btn'),
-  uptimeDisplay: document.getElementById("uptimeDisplay"),
-  loadDisplay: document.getElementById("loadDisplay"),
-  filterPriorityBtn: document.getElementById("filterPriorityBtn"),
-  searchInput: document.getElementById("searchInput"),
-  filterChips: document.querySelectorAll(".filter-chip"),
-  sortSelect: document.getElementById("sortSelect"),
-  dropsCounter: document.getElementById("dropsCounter")
-};
-
-let startTime = null;
-let lastRuntime = null;
-let currentPriority = [];
-let filterMode = 'all'; 
-let filterSearch = '';
-let sortMode = 'priority';
-
-async function apiCall(path, method = "GET", payload = null) {
-  const options = { method, headers: { "Content-Type": "application/json" } };
-  if (payload) options.body = JSON.stringify(payload);
-  const resp = await fetch(path, options);
-  if (!resp.ok) {
-    const errData = await resp.json().catch(() => ({}));
-    throw new Error(errData.error || `Error ${resp.status}`);
-  }
-  return resp.json();
+:root {
+  --bg-app: #0e0e10;
+  --bg-sidebar: #18181b;
+  --bg-card: #1f1f23;
+  --bg-input: #2d2d31;
+  --accent: #9146FF;
+  --text-main: #efeff1;
+  --text-muted: #adadb8;
+  --success: #00f593;
+  --danger: #ff4f4d;
+  --warning: #f5a623;
+  --radius: 4px;
 }
 
-function applyUrlParams() {
-    const params = new URLSearchParams(window.location.search);
-    const tabParam = params.get('tab');
-    if (tabParam) {
-        const btn = document.querySelector(`.nav-btn[data-tab="${tabParam}"]`);
-        if (btn) btn.click();
-    }
-    const searchParam = params.get('search');
-    if (searchParam && ui.searchInput) { ui.searchInput.value = searchParam; filterSearch = searchParam.toLowerCase(); }
-    
-    const filterParam = params.get('filter');
-    if (filterParam) {
-        const chip = document.querySelector(`.filter-chip[data-filter="${filterParam}"]`);
-        if (chip) {
-            ui.filterChips.forEach(c => c.classList.remove('active'));
-            chip.classList.add('active');
-            filterMode = filterParam;
-        }
-    }
-    if (params.get('sort') && ui.sortSelect) { ui.sortSelect.value = params.get('sort'); sortMode = params.get('sort'); }
-    if (params.get('prio') === 'true' && ui.filterPriorityBtn) ui.filterPriorityBtn.checked = true;
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  height: 100vh;
+  overflow: hidden;
+  font-size: 13px;
 }
 
-function updateUrl() {
-    const params = new URLSearchParams();
-    const activeTab = document.querySelector('.nav-btn.active');
-    if(activeTab && activeTab.dataset.tab !== 'dashboard') params.set('tab', activeTab.dataset.tab);
-    if(filterSearch) params.set('search', filterSearch);
-    if(filterMode !== 'all') params.set('filter', filterMode);
-    if(sortMode !== 'priority') params.set('sort', sortMode);
-    if(ui.filterPriorityBtn && ui.filterPriorityBtn.checked) params.set('prio', 'true');
-    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+/* LAYOUT */
+.app-container {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  height: 100vh;
+  width: 100%;
 }
 
-function renderRuntime(runtime) {
-  if (ui.stateText) ui.stateText.textContent = runtime.state || "Unbekannt";
-  const isWorking = ['MINING', 'WORKING'].includes(runtime.state);
+/* SIDEBAR */
+.sidebar {
+  background: var(--bg-sidebar);
+  border-right: 1px solid #303032;
+  padding: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+}
+
+.brand {
+  color: var(--accent);
+  font-size: 1.1rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.nav-links { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+
+.nav-btn {
+  background: transparent; color: var(--text-muted); border: none; text-align: left;
+  padding: 6px 10px; border-radius: var(--radius); font-size: 0.85rem; cursor: pointer;
+  display: flex; align-items: center; gap: 10px; transition: all 0.2s;
+}
+.nav-btn:hover { background: rgba(255,255,255,0.05); color: var(--text-main); }
+.nav-btn.active { background: var(--accent); color: white; font-weight: 600; }
+
+.footer-info { 
+    text-align: center; color: #666; font-size: 0.7rem; 
+    background: rgba(0,0,0,0.2); padding: 4px; border-radius: 4px;
+}
+
+/* CONTENT */
+.content {
+  padding: 0.5rem;
+  overflow-y: auto; overflow-x: hidden; position: relative; width: 100%; box-sizing: border-box;
+}
+.tab-content { display: none; width: 100%; }
+.tab-content.active { display: block; }
+
+/* HERO TOOLBAR - NEUES DESIGN */
+.hero-card {
+  background: var(--bg-card);
+  border: 1px solid #35353b; border-radius: 6px; 
+  padding: 0.4rem 0.6rem;
+  display: flex; 
+  justify-content: space-between;
+  align-items: center; 
+  margin-bottom: 0.5rem; 
+  min-height: 42px;
+}
+
+.status-group { display: flex; align-items: center; gap: 1rem; }
+.status-indicator { display: flex; align-items: center; gap: 8px; }
+.status-indicator h2 { margin: 0; font-size: 0.95rem; white-space: nowrap; font-weight: 600; color: var(--text-main); }
+
+.pulse-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-muted); 
+  box-shadow: 0 0 5px var(--text-muted); transition: all 0.5s;
+}
+.status-mining .pulse-dot { background: var(--success); box-shadow: 0 0 8px var(--success); }
+.status-stopped .pulse-dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+.current-watch {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.85rem; color: #888;
+  padding-left: 1rem; border-left: 1px solid #333;
+}
+.watch-icon { font-size: 0.9rem; color: var(--accent); }
+.watch-info strong { color: #eee; }
+
+/* BUTTONS - PRETTY */
+.main-controls { display: flex; gap: 6px; }
+
+.main-controls button {
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 12px; height: 30px; 
+    font-size: 0.8rem; font-weight: 500;
+    border-radius: 4px; cursor: pointer; transition: all 0.2s;
+}
+
+/* Start Button: Accent/Primary */
+.btn-primary { 
+    background: rgba(145, 70, 255, 0.15); 
+    border: 1px solid rgba(145, 70, 255, 0.3); 
+    color: var(--accent); 
+}
+.btn-primary:hover { 
+    background: rgba(145, 70, 255, 0.25); 
+    border-color: var(--accent); color: white; 
+}
+
+/* Reload Button: Ghost/Neutral */
+.btn-secondary { 
+    background: transparent; 
+    border: 1px solid #444; 
+    color: var(--text-muted); 
+}
+.btn-secondary:hover { 
+    background: rgba(255,255,255,0.05); 
+    border-color: #666; color: white; 
+}
+
+
+/* CARDS & LAYOUT */
+.card { 
+    background: var(--bg-card); padding: 0.5rem; border-radius: 6px; 
+    border: 1px solid #303032; margin-bottom: 0.5rem;
+}
+.full-width { width: 100%; box-sizing: border-box; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+
+/* HEADER COMPLEX */
+.card-header-complex { 
+    display: flex; flex-wrap: wrap; gap: 0.5rem; 
+    border-bottom: 1px solid #303032; padding-bottom: 0.5rem; margin-bottom: 0.5rem; 
+    align-items: center; justify-content: space-between;
+}
+.card-header-complex h3 { 
+    margin: 0; color: var(--text-muted); font-size: 0.9rem; font-weight: 600; 
+    display:flex; align-items: center; gap: 8px; min-width: 80px;
+}
+
+/* FILTERS */
+.filter-toolbar { display: flex; flex: 1; gap: 6px; align-items: center; justify-content: flex-end; }
+.search-box {
+    background: rgba(0,0,0,0.2); border-radius: 3px; padding: 0 6px; display: flex;
+    align-items: center; border: 1px solid #333; height: 26px; flex: 1; max-width: 140px;
+}
+.search-box:focus-within { border-color: var(--accent); }
+.search-box i { font-size: 0.7rem; color: #666; margin-right: 4px;}
+.search-box input { background: transparent; border: none; outline: none; padding: 0; color: white; width: 100%; font-size: 0.8rem; }
+.sort-select {
+    background: rgba(0,0,0,0.2); border: 1px solid #333; color: #ccc;
+    border-radius: 3px; padding: 0 4px; height: 26px; font-size: 0.8rem; cursor: pointer;
+}
+.filter-group { display: flex; background: rgba(0,0,0,0.2); padding: 1px; border-radius: 3px; gap: 1px; }
+.filter-chip { 
+    background: transparent; color: var(--text-muted); padding: 2px 8px; 
+    font-size: 0.75rem; border-radius: 2px; border: none; cursor: pointer;
+}
+.filter-chip.active { background: var(--accent); color: white; }
+.prio-toggle {
+  display: flex; align-items: center; gap: 4px; font-size: 0.75rem; cursor: pointer;
+  background: rgba(255,255,255,0.05); padding: 0 8px; height: 26px; border-radius: 3px; color: var(--text-muted);
+}
+.prio-toggle:has(input:checked) { color: var(--warning); border: 1px solid rgba(245, 166, 35, 0.3); background: rgba(245, 166, 35, 0.1); }
+
+/* TABLES */
+.table-wrapper { overflow-x: auto; width: 100%; max-height: 75vh; }
+table { width: 100%; min-width: 500px; table-layout: fixed; border-collapse: collapse; font-size: 0.8rem; }
+th { 
+    text-align: left; padding: 6px 8px; color: var(--text-muted); 
+    border-bottom: 2px solid #303032; font-size: 0.7rem; text-transform: uppercase;
+    position: sticky; top: 0; background: var(--bg-card); z-index: 10; 
+}
+td { padding: 4px 8px; border-bottom: 1px solid #2a2a2d; vertical-align: top; }
+
+.drops-list { display: flex; flex-direction: column; gap: 2px; }
+.drop-item { background: rgba(255,255,255,0.03); padding: 3px 5px; border-radius: 3px; }
+.drop-header { display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 2px; }
+.drop-name { font-weight: 500; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+.drop-mins { font-family: monospace; color: #888; font-size: 0.7rem; }
+.progress-container { width: 100%; height: 3px; background: #333; border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; transition: width 0.5s; }
+
+/* TIMELINE */
+.timeline-container { max-height: 200px; overflow-y: auto; }
+.timeline-entry { display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03); align-items: center; }
+.t-icon { width: 18px; height: 18px; font-size: 0.65rem; border-radius: 50%; display: flex; justify-content: center; align-items: center; background: #333; color: #aaa; flex-shrink: 0; }
+.t-icon.claim { color: var(--success); background: rgba(0,245,147,0.1); }
+.t-icon.switch { color: var(--accent); background: rgba(145,70,255,0.1); }
+.t-content { flex: 1; display: flex; justify-content: space-between; align-items: center; overflow: hidden; }
+.t-msg { font-size: 0.8rem; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-time { font-size: 0.7rem; color: #666; margin-left: 8px; white-space: nowrap; }
+
+/* SETTINGS FORM */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; }
+.toggles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.5rem; margin-top: 1rem; }
+input, select { padding: 4px 6px; font-size: 0.85rem; height: 28px; background: var(--bg-input); border: 1px solid #444; color: white; border-radius:3px; }
+.toggle-card { padding: 4px 8px; font-size: 0.85rem; background: rgba(255,255,255,0.03); border-radius:3px; display:flex; align-items:center; gap:8px; cursor:pointer;}
+.btn-primary.large { background: var(--accent); color: white; border:none; padding: 6px 16px; font-size: 0.9rem; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+
+@media (max-width: 768px) {
+  .app-container { grid-template-columns: 1fr; grid-template-rows: 40px 1fr; }
+  .sidebar { grid-row: 1; flex-direction: row; padding: 0 0.8rem; height: 40px; align-items: center; border-right: none; border-bottom: 1px solid #303032; justify-content: space-between; }
+  .brand { display: none; }
+  .nav-links { flex-direction: row; gap: 10px; }
+  .nav-btn { padding: 4px; font-size: 1.1rem; }
+  .nav-btn span { display: none; } 
+  .footer-info { display: flex; gap: 8px; margin-left: auto; background: none; }
+  #loadDisplay { margin-top: 0 !important; }
   
-  if (ui.statusDot) {
-      const statusParent = ui.statusDot.parentElement.parentElement;
-      if(isWorking) {
-        statusParent.classList.add('status-mining');
-        statusParent.classList.remove('status-stopped');
-      } else {
-        statusParent.classList.remove('status-mining');
-        statusParent.classList.add('status-stopped');
-      }
-  }
-
-  if (ui.watchingText) {
-      if (runtime.watching) {
-        ui.watchingText.innerHTML = `${runtime.watching.display_name} <small style='opacity:0.6'>(${runtime.watching.game || '?'})</small>`;
-      } else {
-        ui.watchingText.textContent = "Wartet / Idle";
-      }
-  }
+  .content { padding: 0.4rem; }
   
-  if (ui.pendingSwitchText) {
-    ui.pendingSwitchText.textContent = runtime.pending_switch ? `(Wechselt zu: ${runtime.pending_switch})` : "";
-  }
-
-  renderTimeline(runtime.journal || []);
-
-  if (runtime.sys_load && ui.loadDisplay) {
-      ui.loadDisplay.innerHTML = `<i class="fa-solid fa-microchip"></i> ${runtime.sys_load}`;
-  }
-
-  if(runtime.started_at) {
-    startTime = new Date(runtime.started_at);
-  }
-
-  renderTables(runtime);
-}
-
-function renderTimeline(journal) {
-    if (!journal || !ui.timelineList) return;
-    ui.timelineList.innerHTML = "";
-    journal.forEach(entry => {
-        const li = document.createElement("li");
-        li.className = "timeline-entry";
-        let icon = entry.icon ? entry.icon.replace("fa-", "") : "info";
-        li.innerHTML = `
-            <div class="t-icon ${entry.type}">
-                <i class="fa-solid fa-${icon}"></i>
-            </div>
-            <div class="t-content">
-                <div class="t-msg">${entry.msg}</div>
-                <div class="t-time">${new Date(entry.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-            </div>`;
-        ui.timelineList.appendChild(li);
-    });
-}
-
-function getCampaignProgress(c) {
-    let totalMin = 0; let currentMin = 0;
-    (c.drops || []).forEach(d => {
-        totalMin += d.required_minutes;
-        currentMin += d.current_minutes;
-    });
-    return totalMin === 0 ? 0 : (currentMin / totalMin) * 100;
-}
-
-function renderTables(runtime) {
-  if (!ui.campaignsTable) return;
-  ui.campaignsTable.innerHTML = "";
-  let campaigns = [...(runtime.campaigns || [])];
-
-  campaigns.sort((a, b) => {
-      if (sortMode === 'last_seen') {
-          const tA = a.last_seen ? new Date(a.last_seen).getTime() : 0;
-          const tB = b.last_seen ? new Date(b.last_seen).getTime() : 0;
-          return (tB - tA) || a.game.localeCompare(b.game);
-      }
-      if (sortMode === 'name') return a.game.localeCompare(b.game);
-      if (sortMode === 'progress') return getCampaignProgress(b) - getCampaignProgress(a);
-      return (b.active - a.active) || a.game.localeCompare(b.game);
-  });
-
-  let visibleCount = 0;
-  campaigns.forEach(c => {
-    if (filterSearch && !c.game.toLowerCase().includes(filterSearch) && !c.name.toLowerCase().includes(filterSearch)) return;
-    if (ui.filterPriorityBtn && ui.filterPriorityBtn.checked) {
-        if (!currentPriority.some(p => p.toLowerCase() === c.game.toLowerCase())) return;
-    }
-    if (filterMode === 'active' && !c.active) return;
-    const hasProgress = (c.drops || []).some(d => d.current_minutes > 0 && !d.claimed);
-    if (filterMode === 'progressing' && !hasProgress) return;
-    if (filterMode === 'claimed' && c.claimed_drops === 0) return;
-
-    visibleCount++;
-    let dropsHtml = '<div class="drops-list">';
-    (c.drops || []).forEach(d => {
-        let pct = Math.min(100, (d.current_minutes / d.required_minutes) * 100 || 0);
-        dropsHtml += `
-            <div class="drop-item">
-                <div class="drop-header">
-                    <span class="drop-name">${d.name} ${d.claimed ? '✅' : ''}</span>
-                    <span class="drop-mins">${d.current_minutes}/${d.required_minutes}m</span>
-                </div>
-                <div class="progress-container"><div class="progress-fill" style="width:${pct}%; background:${d.claimed ? 'var(--success)':'var(--accent)'}"></div></div>
-            </div>`;
-    });
-    dropsHtml += '</div>';
-
-    let timeInfo = "";
-    if (sortMode === 'last_seen' && c.last_seen) {
-        timeInfo = `<div style="font-size:0.7rem; color:var(--accent); margin-top:2px;"><i class="fa-solid fa-eye"></i> ${new Date(c.last_seen).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
-    }
-
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>
-        <div style="font-weight:bold;">${c.game}</div>
-        <div style="font-size:0.75rem;color:#888;">${c.name}</div>
-        ${timeInfo}
-      </td>
-      <td>${dropsHtml}</td>
-      <td style="text-align:right;">${c.claimed_drops}/${c.total_drops}</td>`;
-    ui.campaignsTable.appendChild(tr);
-  });
+  /* Hero Tweaks Mobile */
+  .hero-card { flex-wrap: wrap; gap: 0.5rem; padding: 0.4rem; justify-content: space-between; }
+  .status-indicator h2 { display: block; font-size: 0.9rem;} /* Status wieder anzeigen */
+  .current-watch { border: none; padding-left: 0; margin-left: 0; font-size: 0.8rem; }
   
-  if (ui.dropsCounter) ui.dropsCounter.textContent = visibleCount;
+  .main-controls button span { display: none; } /* Text weg auf mobile */
+  .main-controls button { padding: 0 8px; }
 
-  if (ui.channelsTable) {
-    ui.channelsTable.innerHTML = "";
-    (runtime.channels || []).forEach(ch => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${ch.login}</td><td style="color:${ch.status === 'online' ? 'var(--success)' : '#555'}">${ch.status}</td><td>${ch.drops_enabled ? '✅' : '❌'}</td>`;
-        ui.channelsTable.appendChild(tr);
-    });
-  }
+  .card-header-complex h3 { display: none; }
+  .filter-toolbar { width: 100%; justify-content: space-between; gap: 4px; }
+  .search-box { max-width: 90px; }
+  .sort-select { max-width: 80px; }
+  .filter-chip { padding: 2px 6px; font-size: 0.7rem; }
+  .grid-2 { grid-template-columns: 1fr; gap: 0.5rem; }
 }
-
-function updateUptime() {
-    if(!startTime || !ui.uptimeDisplay) return;
-    const diff = new Date() - startTime;
-    if (diff < 0) return;
-    const hh = Math.floor(diff / 3600000).toString().padStart(2, '0');
-    const mm = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
-    const ss = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-    ui.uptimeDisplay.innerHTML = `<i class="fa-regular fa-clock"></i> ${hh}:${mm}:${ss}`;
-}
-
-ui.tabButtons.forEach(btn => btn.onclick = () => {
-    ui.tabButtons.forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    updateUrl();
-});
-
-ui.filterChips.forEach(chip => chip.onclick = () => {
-    ui.filterChips.forEach(c => c.classList.remove('active'));
-    chip.classList.add('active');
-    filterMode = chip.dataset.filter;
-    updateUrl(); if(lastRuntime) renderTables(lastRuntime);
-});
-
-if (ui.searchInput) ui.searchInput.oninput = (e) => { filterSearch = e.target.value.toLowerCase(); updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
-if (ui.filterPriorityBtn) ui.filterPriorityBtn.onchange = () => { updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
-if (ui.sortSelect) ui.sortSelect.onchange = (e) => { sortMode = e.target.value; updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
-
-if (ui.startBtn) ui.startBtn.onclick = () => apiCall("/api/actions/start");
-if (ui.reloadBtn) ui.reloadBtn.onclick = () => apiCall("/api/actions/reload");
-
-if (ui.settingsForm) ui.settingsForm.onsubmit = async (e) => {
-    e.preventDefault();
-    const f = new FormData(ui.settingsForm);
-    const payload = {
-        language: f.get("language"), proxy: f.get("proxy"),
-        priority: f.get("priority").split(",").map(x => x.trim()).filter(Boolean),
-        exclude: f.get("exclude").split(",").map(x => x.trim()).filter(Boolean),
-        priority_mode: f.get("priority_mode"), connection_quality: Number(f.get("connection_quality")),
-        available_drops_check: f.get("available_drops_check") === "on",
-        enable_badges_emotes: f.get("enable_badges_emotes") === "on",
-        tray_notifications: f.get("tray_notifications") === "on",
-        autostart_tray: f.get("autostart_tray") === "on",
-    };
-    try {
-        await apiCall("/api/settings", "PUT", payload);
-        if (ui.settingsStatus) {
-            ui.settingsStatus.textContent = "Gespeichert!";
-            setTimeout(() => ui.settingsStatus.textContent = "", 3000);
-        }
-    } catch(err) { alert(err.message); }
-};
-
-async function pollSnapshot() {
-  try {
-    const data = await apiCall("/api/snapshot");
-    if (data.settings && ui.settingsForm && !ui.settingsForm.contains(document.activeElement)) {
-        currentPriority = data.settings.priority || [];
-        const s = data.settings; const f = ui.settingsForm;
-        f.language.value = s.language; f.proxy.value = s.proxy;
-        f.priority.value = (s.priority || []).join(", "); f.exclude.value = (s.exclude || []).join(", ");
-        f.priority_mode.value = s.priority_mode; f.connection_quality.value = s.connection_quality;
-        f.available_drops_check.checked = s.available_drops_check; f.enable_badges_emotes.checked = s.enable_badges_emotes;
-        f.tray_notifications.checked = s.tray_notifications; f.autostart_tray.checked = s.autostart_tray;
-    }
-    if (data.runtime) { lastRuntime = data.runtime; renderRuntime(data.runtime); }
-  } catch (err) { console.warn("Poll Error:", err); }
-}
-
-applyUrlParams();
-setInterval(pollSnapshot, refreshMs);
-setInterval(updateUptime, 1000);
-pollSnapshot();
