@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Twitch Drops Miner</title>
+  <title>Drops Miner</title>
   <link rel="stylesheet" href="/webui/styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -12,7 +12,7 @@
   <div class="app-container">
     <nav class="sidebar">
       <div class="brand">
-        <i class="fa-brands fa-twitch"></i>
+        <i class="fa-solid fa-cube"></i>
         <span>Drops Miner</span>
       </div>
 
@@ -27,7 +27,7 @@
 
       <div class="footer-info">
         <div id="uptimeDisplay" title="Laufzeit"><i class="fa-regular fa-clock"></i> 00:00</div>
-        <div id="loadDisplay" title="System Load" style="margin-top:6px; font-family:monospace; color:#888; font-size:0.75rem;">L: -</div>
+        <div id="loadDisplay" title="System Load" style="margin-top:6px; font-family:monospace;">L: -</div>
       </div>
     </nav>
 
@@ -36,28 +36,16 @@
       <div id="tab-dashboard" class="tab-content active">
 
         <section class="hero-card">
-          <div class="status-group">
-             <div class="status-indicator">
-                <span class="pulse-dot" id="statusDot"></span>
-                <h2 id="stateText">Status</h2>
-             </div>
+           <div class="status-indicator">
+              <span class="pulse-dot" id="statusDot"></span>
+              <h2 id="stateText">Status</h2>
+           </div>
 
-             <div class="current-watch">
-                <i class="fa-solid fa-tv watch-icon"></i>
-                <span id="watchingText">-</span>
-                <span id="pendingSwitchText" class="sub-text"></span>
-             </div>
-          </div>
-
-          <div class="main-controls">
-            <button id="startBtn" class="btn-primary" title="Mining Starten">
-                <i class="fa-solid fa-play"></i> <span>Start</span>
-            </button>
-            <button id="reloadBtn" class="btn-secondary" title="Konfig neu laden">
-                <i class="fa-solid fa-rotate-right"></i> <span>Reload</span>
-            </button>
-          </div>
-          <div id="actionStatus" class="status-message"></div>
+           <div class="current-watch">
+              <i class="fa-solid fa-tv watch-icon"></i>
+              <span id="watchingText">-</span>
+              <span id="pendingSwitchText" class="sub-text"></span>
+           </div>
         </section>
 
         <section class="card full-width">
@@ -134,7 +122,6 @@
               </table>
             </div>
           </section>
-
         </div>
       </div>
 
@@ -142,7 +129,7 @@
         <section class="card">
           <div class="card-header-complex">
             <h3>Konfiguration</h3>
-            <span id="settingsStatus" class="status-message"></span>
+            <span id="settingsStatus" class="status-message" style="font-size:0.85rem"></span>
           </div>
 
           <form id="settingsForm">

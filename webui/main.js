@@ -1,9 +1,6 @@
 const refreshMs = 1000;
 
 const ui = {
-  startBtn: document.getElementById("startBtn"),
-  reloadBtn: document.getElementById("reloadBtn"),
-  actionStatus: document.getElementById("actionStatus"),
   settingsForm: document.getElementById("settingsForm"),
   settingsStatus: document.getElementById("settingsStatus"),
   stateText: document.getElementById("stateText"),
@@ -194,7 +191,7 @@ function renderTables(runtime) {
     tr.innerHTML = `
       <td>
         <div style="font-weight:bold;">${c.game}</div>
-        <div style="font-size:0.75rem;color:#888;">${c.name}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);">${c.name}</div>
         ${timeInfo}
       </td>
       <td>${dropsHtml}</td>
@@ -242,9 +239,6 @@ ui.filterChips.forEach(chip => chip.onclick = () => {
 if (ui.searchInput) ui.searchInput.oninput = (e) => { filterSearch = e.target.value.toLowerCase(); updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
 if (ui.filterPriorityBtn) ui.filterPriorityBtn.onchange = () => { updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
 if (ui.sortSelect) ui.sortSelect.onchange = (e) => { sortMode = e.target.value; updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
-
-if (ui.startBtn) ui.startBtn.onclick = () => apiCall("/api/actions/start");
-if (ui.reloadBtn) ui.reloadBtn.onclick = () => apiCall("/api/actions/reload");
 
 if (ui.settingsForm) ui.settingsForm.onsubmit = async (e) => {
     e.preventDefault();
