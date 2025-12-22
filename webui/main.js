@@ -1,55 +1,39 @@
 const refreshMs = 2500;
-// Buttons
 const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
 const reloadBtn = document.getElementById("reloadBtn");
 const switchBtn = document.getElementById("switchBtn");
-
-// Inputs / Displays
 const channelInput = document.getElementById("channelInput");
 const actionStatus = document.getElementById("actionStatus");
 const settingsForm = document.getElementById("settingsForm");
 const settingsStatus = document.getElementById("settingsStatus");
-
-// Status Displays
 const stateText = document.getElementById("stateText");
-const statusDot = document.getElementById("statusDot"); // Neu für Visual
+const statusDot = document.getElementById("statusDot");
 const watchingText = document.getElementById("watchingText");
 const pendingSwitchText = document.getElementById("pendingSwitchText");
-// const lastReloadText = document.getElementById("lastReloadText"); // Entfernt im UI, optional wieder einbaubar
 const errorsList = document.getElementById("errorsList");
-
-// Tables
 const channelsTable = document.querySelector("#channelsTable tbody");
 const campaignsTable = document.querySelector("#campaignsTable tbody");
 
-// Tab Navigation
 const tabButtons = document.querySelectorAll('.nav-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
 let pollHandle;
 
-// --- TAB LOGIC ---
 tabButtons.forEach(btn => {
   btn.addEventListener('click', () => {
-    // Remove active class from all
     tabButtons.forEach(b => b.classList.remove('active'));
     tabContents.forEach(c => c.classList.remove('active'));
 
-    // Add active to clicked
     btn.classList.add('active');
     const tabId = `tab-${btn.dataset.tab}`;
     document.getElementById(tabId).classList.add('active');
   });
 });
 
-// --- HELPER FUNCTIONS ---
-
 function setActionStatus(message, ok = true) {
   actionStatus.textContent = message || "";
   actionStatus.style.color = ok ? "#adadb8" : "#ff4f4d";
-
-  // Clear status after 3 seconds for cleaner UI
   if(message) setTimeout(() => { actionStatus.textContent = ''; }, 3000);
 }
 
@@ -59,7 +43,6 @@ function setSettingsStatus(message, ok = true) {
   if(message) setTimeout(() => { settingsStatus.textContent = ''; }, 3000);
 }
 
-// --- API WRAPPERS ---
 async function apiPost(path, payload) {
   const resp = await fetch(path, {
     method: "POST",
@@ -90,7 +73,6 @@ async function apiPut(path, payload) {
   return data;
 }
 
-// --- SETTINGS LOGIC ---
 function serializeSettings(formData) {
   const toList = (value) => value.split(",").map((v) => v.trim()).filter(Boolean);
 
@@ -120,8 +102,6 @@ function fillSettings(settings) {
   settingsForm.tray_notifications.checked = Boolean(settings.tray_notifications);
   settingsForm.autostart_tray.checked = Boolean(settings.autostart_tray);
 }
-
-// --- RENDER LOGIC ---
 
 function renderChannels(channels = []) {
   channelsTable.innerHTML = "";
@@ -160,7 +140,6 @@ function renderCampaigns(campaigns = []) {
     const status = c.active ? "<span style='color:var(--success)'>Aktiv</span>" : c.upcoming ? "Bald" : "Inaktiv";
     const window = [c.starts_at, c.ends_at].filter(Boolean).map(d => new Date(d).toLocaleDateString()).join(" - ");
 
-    // Safety check for math
     let pct = 0;
     if(c.total_drops > 0) {
         pct = Math.round((c.claimed_drops / c.total_drops) * 100);
@@ -187,7 +166,6 @@ function renderCampaigns(campaigns = []) {
 function renderRuntime(runtime) {
   stateText.textContent = runtime.state || "Unbekannt";
 
-  // Visual Indicator Logic
   const parent = document.querySelector('.status-indicator').parentElement;
   if(runtime.state === 'MINING' || runtime.state === 'WORKING') {
       parent.classList.add('status-mining');
@@ -210,7 +188,6 @@ function renderRuntime(runtime) {
       pendingSwitchText.textContent = "";
   }
 
-  // Errors list
   errorsList.innerHTML = "";
   if(!runtime.errors || runtime.errors.length === 0) {
       const li = document.createElement("li");
@@ -231,8 +208,6 @@ function renderRuntime(runtime) {
   renderCampaigns(runtime.campaigns);
 }
 
-// --- INITIALIZATION ---
-
 async function loadSettings() {
   try {
     const settings = await apiGet("/api/settings");
@@ -245,10 +220,16 @@ async function loadSettings() {
 async function pollSnapshot() {
   try {
     const data = await apiGet("/api/snapshot");
-    if (data.settings) fillSettings(data.settings);
+
+    const isUserEditing = settingsForm.contains(document.activeElement);
+
+    if (data.settings && !isUserEditing) {
+        fillSettings(data.settings);
+    }
+
     if (data.runtime) renderRuntime(data.runtime);
   } catch (err) {
-    setActionStatus(`Snapshot Fehler: ${err.message}`, false);
+    console.error("Snapshot failed:", err);
   }
 }
 
@@ -257,8 +238,6 @@ function startPolling() {
   pollHandle = setInterval(pollSnapshot, refreshMs);
   pollSnapshot();
 }
-
-// --- EVENT LISTENERS ---
 
 startBtn.addEventListener("click", async () => {
   try {
@@ -304,6 +283,5 @@ document.addEventListener("visibilitychange", () => {
   else startPolling();
 });
 
-// Start
 loadSettings();
 startPolling();

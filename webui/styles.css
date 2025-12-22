@@ -26,14 +26,12 @@ body {
   overflow: hidden;
 }
 
-/* Layout */
 .app-container {
   display: grid;
   grid-template-columns: 250px 1fr;
   height: 100vh;
 }
 
-/* Sidebar */
 .sidebar {
   background: var(--bg-sidebar);
   display: flex;
@@ -91,7 +89,6 @@ body {
   text-align: center;
 }
 
-/* Content Area */
 .content {
   padding: 2rem;
   overflow-y: auto;
@@ -112,7 +109,6 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Hero Card */
 .hero-card {
   background: linear-gradient(145deg, var(--bg-card), #26262c);
   border-radius: 12px;
@@ -161,7 +157,6 @@ body {
   flex-direction: column;
 }
 
-/* Buttons */
 button { border: none; cursor: pointer; font-family: inherit; transition: filter 0.2s; }
 button:hover { filter: brightness(1.2); }
 
@@ -172,7 +167,6 @@ button:hover { filter: brightness(1.2); }
 
 .btn-primary.large { width: 100%; padding: 1rem; font-size: 1.1rem; }
 
-/* Grid & Cards */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
 .card { background: var(--bg-card); padding: 1.5rem; border-radius: 12px; border: 1px solid #303032; }
 .full-width { width: 100%; }
@@ -180,7 +174,6 @@ button:hover { filter: brightness(1.2); }
 
 h3 { margin-top: 0; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid #303032; padding-bottom: 0.5rem; margin-bottom: 1rem; }
 
-/* Inputs */
 input, select {
   background: var(--bg-input);
   border: 1px solid #444;
@@ -192,21 +185,17 @@ input, select {
 }
 input:focus, select:focus { outline: 2px solid var(--accent); border-color: transparent; }
 
-/* Switcher */
 .switcher-box { display: flex; gap: 0.5rem; height: 40px; }
 
-/* Tables */
 .table-wrapper { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 th { text-align: left; padding: 12px; color: var(--text-muted); background: rgba(0,0,0,0.2); }
 td { padding: 12px; border-bottom: 1px solid #303032; }
 tr:hover td { background: rgba(255,255,255,0.02); }
 
-/* Progress Bar in Table (Optional visual) */
 .progress-container { width: 100px; height: 6px; background: #333; border-radius: 3px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 8px; }
 .progress-fill { height: 100%; background: var(--accent); }
 
-/* Settings Form */
 .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
 .toggles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
 
@@ -223,12 +212,10 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 .toggle-card:hover { border-color: var(--accent); }
 .toggle-card input { width: auto; margin: 0; }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg-app); }
 ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
 
-/* Responsiveness */
 @media (max-width: 768px) {
   .app-container { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .sidebar { flex-direction: row; align-items: center; padding: 1rem; overflow-x: auto; }
