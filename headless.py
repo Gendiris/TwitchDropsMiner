@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from inventory import DropsCampaign, TimedDrop
     from miner_service import MinerService
     from twitch import Twitch
+    from utils import Game
 
 
 logger = logging.getLogger("TwitchDrops")
@@ -200,6 +201,10 @@ class HeadlessGUI:
         return
 
     def grab_attention(self, *, sound: bool = True) -> None:
+        return
+
+    def set_games(self, games: set["Game"]) -> None:
+        # Headless mode does not need to surface selectable games, but keep API parity
         return
 
     def print(self, message: str) -> None:
