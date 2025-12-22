@@ -19,6 +19,9 @@ const tabButtons = document.querySelectorAll('.nav-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
 let pollHandle;
+let settingsDirty = false;
+let lastSettingsEdit = 0;
+const editGraceMs = 5000;
 
 tabButtons.forEach(btn => {
   btn.addEventListener('click', () => {
@@ -90,6 +93,16 @@ function serializeSettings(formData) {
   };
 }
 
+function markSettingsDirty() {
+  settingsDirty = true;
+  lastSettingsEdit = Date.now();
+}
+
+function clearSettingsDirty() {
+  settingsDirty = false;
+  lastSettingsEdit = 0;
+}
+
 function fillSettings(settings) {
   settingsForm.language.value = settings.language ?? "";
   settingsForm.proxy.value = settings.proxy ?? "";
@@ -101,6 +114,7 @@ function fillSettings(settings) {
   settingsForm.connection_quality.value = settings.connection_quality ?? 0;
   settingsForm.tray_notifications.checked = Boolean(settings.tray_notifications);
   settingsForm.autostart_tray.checked = Boolean(settings.autostart_tray);
+  clearSettingsDirty();
 }
 
 function renderChannels(channels = []) {
@@ -222,8 +236,9 @@ async function pollSnapshot() {
     const data = await apiGet("/api/snapshot");
 
     const isUserEditing = settingsForm.contains(document.activeElement);
+    const canRefreshSettings = !settingsDirty || (Date.now() - lastSettingsEdit) >= editGraceMs;
 
-    if (data.settings && !isUserEditing) {
+    if (data.settings && !isUserEditing && canRefreshSettings) {
         fillSettings(data.settings);
     }
 
@@ -238,6 +253,15 @@ function startPolling() {
   pollHandle = setInterval(pollSnapshot, refreshMs);
   pollSnapshot();
 }
+
+["input", "change", "blur"].forEach((evt) => {
+  settingsForm.addEventListener(evt, (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (!settingsForm.contains(target)) return;
+    markSettingsDirty();
+  });
+});
 
 startBtn.addEventListener("click", async () => {
   try {
@@ -274,6 +298,7 @@ settingsForm.addEventListener("submit", async (event) => {
   const payload = serializeSettings(new FormData(settingsForm));
   try {
     await apiPut("/api/settings", payload);
+    clearSettingsDirty();
     setSettingsStatus("Einstellungen gespeichert!");
   } catch (err) { setSettingsStatus(`Fehler: ${err.message}`, false); }
 });
