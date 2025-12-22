@@ -222,10 +222,12 @@ input, select { width: 100%; box-sizing: border-box; background: var(--bg-input)
   .nav-btn { padding: 8px; font-size: 1.2rem; }
   .nav-btn[data-tab="dashboard"] span { display: inline-block; font-size: 0.9rem; }
   .content { padding: 0.8rem; }
-  .hero-card { grid-template-columns: 1fr auto; gap: 0.8rem; padding: 0.8rem; }
+  .hero-card { grid-template-columns: 1fr; gap: 0.8rem; padding: 0.8rem; align-items: stretch; }
   .status-indicator h2 { display: none; }
-  .current-watch { display: none; }
-  .main-controls { justify-content: flex-end; }
+  .current-watch { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+  .watch-info { width: 100%; }
+  .watch-info strong, #watchingText, #pendingSwitchText { white-space: normal; line-height: 1.3; }
+  .main-controls { justify-content: flex-start; flex-wrap: wrap; gap: 0.5rem; }
   .filter-toolbar { gap: 0.5rem; align-items: stretch; }
   .search-prio-group { flex: 1 1 100%; }
   .search-box { width: 100%; flex: 1 1 auto; }
