@@ -139,6 +139,54 @@ html, body {
 .tab-content { display: none; height: 100%; }
 .tab-content.active { display: flex; flex-direction: column; gap: 0.75rem; }
 
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.form-group input,
+.form-group select {
+    padding: 0.55rem 0.65rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #101013;
+    color: var(--text-main);
+}
+
+.toggles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.5rem;
+}
+
+.toggle-card {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #101013;
+    border: 1px solid var(--border);
+    padding: 0.55rem 0.65rem;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.toggle-card input {
+    accent-color: var(--primary);
+}
+
 /* Dashboard Layout for Ultrawide Short (1580x502) */
 .dashboard-grid {
     display: grid;

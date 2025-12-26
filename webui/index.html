@@ -133,7 +133,51 @@
             <span id="settingsStatus"></span>
           </div>
           <form id="settingsForm">
-             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+             <div class="form-grid">
+                <div class="form-group">
+                    <label>Sprache</label>
+                    <select name="language">
+                        <option value="English">English</option>
+                        <option value="Dansk">Dansk</option>
+                        <option value="Deutsch">Deutsch</option>
+                        <option value="Español">Español</option>
+                        <option value="Français">Français</option>
+                        <option value="Indonesian">Indonesian</option>
+                        <option value="Italiano">Italiano</option>
+                        <option value="Nederlands">Nederlands</option>
+                        <option value="Norsk">Norsk</option>
+                        <option value="Polski">Polski</option>
+                        <option value="Português">Português</option>
+                        <option value="Română">Română</option>
+                        <option value="Türkçe">Türkçe</option>
+                        <option value="Українська">Українська</option>
+                        <option value="Русский">Русский</option>
+                        <option value="日本語">日本語</option>
+                        <option value="العربية">العربية</option>
+                        <option value="简体中文">简体中文</option>
+                        <option value="繁體中文">繁體中文</option>
+                        <option value="Čeština">Čeština</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Prioritätsmodus</label>
+                    <select name="priority_mode">
+                        <option value="PRIORITY_ONLY">Priorität zuerst</option>
+                        <option value="ENDING_SOONEST">Endet am frühesten</option>
+                        <option value="LOW_AVBL_FIRST">Niedrige Verfügbarkeit</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Verbindungsqualität</label>
+                    <select name="connection_quality">
+                        <option value="1">1 - Schnell</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6 - Stabil</option>
+                    </select>
+                </div>
                 <div class="form-group">
                     <label>Priorität</label>
                     <input type="text" name="priority">
@@ -148,7 +192,7 @@
                 </div>
              </div>
 
-             <div class="toggles-grid" style="grid-template-columns: 1fr 1fr; border:none; margin:0; padding:0;">
+             <div class="toggles-grid">
                 <label class="toggle-card"><input type="checkbox" name="tray_notifications"> <span>Tray Info</span></label>
                 <label class="toggle-card"><input type="checkbox" name="autostart_tray"> <span>Autostart</span></label>
                 <label class="toggle-card"><input type="checkbox" name="enable_badges_emotes"> <span>Farm Badges</span></label>
