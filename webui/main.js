@@ -14,6 +14,8 @@ const ui = {
   uptimeDisplay: document.getElementById("uptimeDisplay"),
   loadDisplay: document.getElementById("loadDisplay"),
   lastReloadDisplay: document.getElementById("lastReloadDisplay"),
+  reloadButton: document.getElementById("reloadButton"),
+  actionStatus: document.getElementById("actionStatus"),
   filterPriorityBtn: document.getElementById("filterPriorityBtn"),
   searchInput: document.getElementById("searchInput"),
   filterChips: document.querySelectorAll(".filter-chip"),
@@ -91,6 +93,8 @@ function formatTimelineDate(isoString) {
 function renderRuntime(runtime) {
   if (ui.stateText) ui.stateText.textContent = runtime.state || "Unbekannt";
   const isWorking = ['MINING', 'WORKING'].includes(runtime.state);
+
+  if (ui.reloadButton) ui.reloadButton.disabled = !isWorking;
 
   if (ui.statusDot) {
       const statusParent = ui.statusDot.parentElement.parentElement;
@@ -246,6 +250,18 @@ function updateUptime() {
     ui.uptimeDisplay.innerHTML = `<i class="fa-regular fa-clock"></i> ${hh}:${mm}:${ss}`;
 }
 
+function setReloadStatus(message, isError = false) {
+    if (!ui.actionStatus) return;
+    ui.actionStatus.textContent = message || '';
+    ui.actionStatus.style.color = isError ? 'var(--danger)' : '';
+}
+
+function canReload() {
+    return lastRuntime && ['MINING', 'WORKING'].includes(lastRuntime.state);
+}
+
+if (ui.reloadButton) ui.reloadButton.disabled = true;
+
 ui.tabButtons.forEach(btn => btn.onclick = () => {
     ui.tabButtons.forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -264,6 +280,26 @@ ui.filterChips.forEach(chip => chip.onclick = () => {
 if (ui.searchInput) ui.searchInput.oninput = (e) => { filterSearch = e.target.value.toLowerCase(); updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
 if (ui.filterPriorityBtn) ui.filterPriorityBtn.onchange = () => { updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
 if (ui.sortSelect) ui.sortSelect.onchange = (e) => { sortMode = e.target.value; updateUrl(); if(lastRuntime) renderTables(lastRuntime); };
+
+if (ui.reloadButton) ui.reloadButton.onclick = async () => {
+    if (!canReload()) { setReloadStatus('Reload nicht verfügbar', true); return; }
+    ui.reloadButton.disabled = true;
+    setReloadStatus('Reload wird ausgeführt...');
+    try {
+        const resp = await apiCall("/api/actions/reload", "POST");
+        console.log('Reload erfolgreich', resp);
+        setReloadStatus('Reload erfolgreich');
+        if (ui.lastReloadDisplay) {
+            const d = new Date();
+            ui.lastReloadDisplay.innerHTML = `<i class="fa-solid fa-rotate"></i> ${d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+        }
+    } catch (err) {
+        console.error('Reload fehlgeschlagen', err);
+        setReloadStatus(`Reload fehlgeschlagen: ${err.message}`, true);
+    } finally {
+        if (ui.reloadButton && canReload()) ui.reloadButton.disabled = false;
+    }
+};
 
 if (ui.settingsForm) ui.settingsForm.onsubmit = async (e) => {
     e.preventDefault();
