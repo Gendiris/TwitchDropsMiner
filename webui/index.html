@@ -17,186 +17,139 @@
       </div>
 
       <div class="nav-links">
-        <button class="nav-btn active" data-tab="dashboard" title="Dashboard">
+        <button class="nav-btn active" data-tab="dashboard">
           <i class="fa-solid fa-chart-line"></i> <span>Dashboard</span>
         </button>
-        <button class="nav-btn" data-tab="settings" title="Einstellungen">
+        <button class="nav-btn" data-tab="settings">
           <i class="fa-solid fa-gear"></i> <span>Settings</span>
         </button>
       </div>
 
       <div class="footer-info">
-        <div id="uptimeDisplay" title="Laufzeit"><i class="fa-regular fa-clock"></i> 00:00</div>
+        <div id="uptimeDisplay"><i class="fa-regular fa-clock"></i> 00:00</div>
         <div class="reload-control">
-          <button id="reloadButton" data-action="reload" class="reload-btn" title="Stream/Drop Reload">
-            <i class="fa-solid fa-rotate"></i>
-            <span>Reload</span>
+          <button id="reloadButton" data-action="reload" class="reload-btn">
+            <i class="fa-solid fa-rotate"></i> Reload
           </button>
-          <div id="lastReloadDisplay" class="reload-time" title="Letzter Reload">
-            <i class="fa-solid fa-clock-rotate-left"></i>
-            <span>--:--</span>
-          </div>
         </div>
-        <div id="actionStatus" class="status-message" style="font-size:0.85rem"></div>
-        <div id="loadDisplay" title="System Load">L: -</div>
+        <div id="actionStatus" class="status-message"></div>
       </div>
     </nav>
 
     <main class="content">
 
-      <div id="tab-dashboard" class="tab-content active dashboard-layout">
+      <div id="tab-dashboard" class="tab-content active">
+        <div class="dashboard-grid">
 
-        <section class="hero-card compact">
-           <div class="status-indicator">
-              <span class="pulse-dot" id="statusDot"></span>
-              <h2 id="stateText">Status</h2>
-           </div>
+            <div class="header-area">
+                <section class="hero-card">
+                    <div class="status-indicator">
+                        <span class="pulse-dot" id="statusDot"></span>
+                        <h2 id="stateText">Status</h2>
+                    </div>
+                    <div class="current-watch">
+                        <i class="fa-solid fa-tv watch-icon"></i>
+                        <span id="watchingText">Warten...</span>
+                    </div>
+                </section>
+            </div>
 
-           <div class="current-watch">
-              <i class="fa-solid fa-tv watch-icon"></i>
-              <span id="watchingText">-</span>
-              <span id="pendingSwitchText" class="sub-text"></span>
-           </div>
-        </section>
+            <section class="card drops-area">
+                <div class="card-header-complex">
+                    <h3>Drops <span id="dropsCounter" style="opacity:0.5; font-size:0.8rem">0</span></h3>
 
-        <section class="card flex-grow-card" style="flex: 2;">
-          <div class="card-header-complex">
-            <h3>
-                <span>Drops</span>
-                <span id="dropsCounter" style="font-size:0.8rem; font-weight:normal; opacity:0.6; margin-left:8px;">0</span>
-            </h3>
-
-            <div class="filter-toolbar">
-                <div class="search-box">
-                    <i class="fa-solid fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Suche...">
+                    <div class="filter-toolbar">
+                        <div class="search-box">
+                            <input type="text" id="searchInput" placeholder="Suche...">
+                        </div>
+                        <div class="filter-group" style="display:flex; gap:2px;">
+                            <button class="filter-chip active" data-filter="all">Alle</button>
+                            <button class="filter-chip" data-filter="progressing">Laufend</button>
+                        </div>
+                        <label class="prio-toggle" title="Nur Prio">
+                            <input type="checkbox" id="filterPriorityBtn">
+                            <span style="color:gold; font-size:1.2rem; cursor:pointer;">★</span>
+                        </label>
+                    </div>
                 </div>
 
-                <select id="sortSelect" class="sort-select">
-                    <option value="priority">Prio</option>
-                    <option value="last_seen">Zuletzt gesehen</option>
-                    <option value="progress">%</option>
-                    <option value="name">A-Z</option>
-                </select>
-
-                <div class="filter-group">
-                    <button class="filter-chip active" data-filter="all">Alle</button>
-                    <button class="filter-chip" data-filter="progressing">Laufend</button>
-                    <button class="filter-chip" data-filter="active">Aktiv</button>
+                <div class="table-wrapper">
+                    <table id="campaignsTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 40%">Game</th>
+                                <th>Fortschritt</th>
+                                <th style="width: 50px; text-align:right;">Claim</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
+            </section>
 
-                <label class="prio-toggle" title="Nur Prio">
-                    <input type="checkbox" id="filterPriorityBtn">
-                    <span>★</span>
-                </label>
-            </div>
-          </div>
+            <div class="info-area">
+                <section class="card" style="flex: 1; min-height: 0;">
+                    <div class="card-header-complex">
+                        <h3>Log</h3>
+                    </div>
+                    <div class="timeline-container">
+                        <ul id="timelineList" class="timeline"></ul>
+                    </div>
+                </section>
 
-          <div class="table-wrapper">
-            <table id="campaignsTable">
-              <thead>
-                <tr>
-                  <th style="width: 35%">Game</th>
-                  <th>Progress</th>
-                  <th style="width: 60px; text-align:right;">Clm</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </section>
+                <section class="card" style="flex: 1; min-height: 0;">
+                     <div class="card-header-complex">
+                        <h3>Kanäle</h3>
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="channelsTable">
+                            <thead>
+                                <tr>
+                                    <th>Login</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
 
-        <div class="grid-2 mt-1" style="flex: 1; min-height: 0;">
-          <section class="card flex-col-card">
-             <div class="card-header-complex">
-              <h3>Aktivität</h3>
-            </div>
-            <div class="timeline-container scrollable-y">
-                <ul id="timelineList" class="timeline"></ul>
-            </div>
-          </section>
-
-          <section class="card flex-col-card">
-            <div class="card-header-complex">
-              <h3>Kanäle</h3>
-            </div>
-            <div class="table-wrapper">
-              <table id="channelsTable">
-                <thead>
-                  <tr>
-                    <th>Login</th>
-                    <th>Status</th>
-                    <th>Drops</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </section>
         </div>
       </div>
 
       <div id="tab-settings" class="tab-content">
-        <section class="card scrollable-card">
+        <section class="card" style="height:100%; overflow-y:auto;">
           <div class="card-header-complex">
-            <h3>Konfiguration</h3>
-            <span id="settingsStatus" class="status-message" style="font-size:0.85rem"></span>
+            <h3>Einstellungen</h3>
+            <span id="settingsStatus"></span>
           </div>
-
           <form id="settingsForm">
-            <div class="form-grid">
-              <div class="form-group">
-                <label>Priorität</label>
-                <input type="text" name="priority" placeholder="Rust, CSGO...">
-              </div>
-              <div class="form-group">
-                <label>Ausschluss</label>
-                <input type="text" name="exclude">
-              </div>
-              <div class="form-group">
-                <label>Modus</label>
-                <select name="priority_mode">
-                  <option value="PRIORITY_ONLY">Nur Priorität</option>
-                  <option value="ENDING_SOONEST">Endet bald</option>
-                  <option value="LOW_AVBL_FIRST">Seltene zuerst</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Proxy</label>
-                <input type="text" name="proxy" placeholder="http://user:pass@host:port">
-              </div>
-              <div class="form-group">
-                <label>Sprache</label>
-                <input type="text" name="language" placeholder="en, de">
-              </div>
-               <div class="form-group">
-                <label>Qualität</label>
-                <input type="number" name="connection_quality" min="0" max="5">
-              </div>
-            </div>
+             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:1rem; margin-bottom:1rem;">
+                <div class="form-group">
+                    <label>Priorität</label>
+                    <input type="text" name="priority">
+                </div>
+                <div class="form-group">
+                    <label>Ausschluss</label>
+                    <input type="text" name="exclude">
+                </div>
+                 <div class="form-group">
+                    <label>Proxy</label>
+                    <input type="text" name="proxy">
+                </div>
+             </div>
 
-            <div class="toggles-grid">
-              <label class="toggle-card">
-                <input type="checkbox" name="available_drops_check">
-                <span>Check Avbl.</span>
-              </label>
-              <label class="toggle-card">
-                <input type="checkbox" name="enable_badges_emotes">
-                <span>Farm Badges</span>
-              </label>
-              <label class="toggle-card">
-                <input type="checkbox" name="tray_notifications">
-                <span>Tray Notif.</span>
-              </label>
-              <label class="toggle-card">
-                <input type="checkbox" name="autostart_tray">
-                <span>Autostart</span>
-              </label>
-            </div>
+             <div class="toggles-grid" style="grid-template-columns: 1fr 1fr; border:none; margin:0; padding:0;">
+                <label class="toggle-card"><input type="checkbox" name="tray_notifications"> <span>Tray Info</span></label>
+                <label class="toggle-card"><input type="checkbox" name="autostart_tray"> <span>Autostart</span></label>
+                <label class="toggle-card"><input type="checkbox" name="enable_badges_emotes"> <span>Farm Badges</span></label>
+                <label class="toggle-card"><input type="checkbox" name="available_drops_check"> <span>Check Drops</span></label>
+             </div>
 
-            <div class="form-actions right" style="margin-top:1rem; text-align:right;">
-              <button type="submit" class="btn-primary large">Speichern</button>
-            </div>
+             <div style="text-align:right; margin-top:1rem;">
+                <button type="submit" class="btn-primary" style="background:var(--primary); color:white; border:none; padding:8px 16px; border-radius:4px;">Speichern</button>
+             </div>
           </form>
         </section>
       </div>
