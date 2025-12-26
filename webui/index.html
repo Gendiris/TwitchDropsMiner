@@ -44,9 +44,9 @@
 
     <main class="content">
 
-      <div id="tab-dashboard" class="tab-content active">
+      <div id="tab-dashboard" class="tab-content active dashboard-layout">
 
-        <section class="hero-card">
+        <section class="hero-card compact">
            <div class="status-indicator">
               <span class="pulse-dot" id="statusDot"></span>
               <h2 id="stateText">Status</h2>
@@ -59,7 +59,7 @@
            </div>
         </section>
 
-        <section class="card full-width">
+        <section class="card flex-grow-card" style="flex: 2;">
           <div class="card-header-complex">
             <h3>
                 <span>Drops</span>
@@ -106,17 +106,17 @@
           </div>
         </section>
 
-        <div class="grid-2 mt-1">
-          <section class="card">
+        <div class="grid-2 mt-1" style="flex: 1; min-height: 0;">
+          <section class="card flex-col-card">
              <div class="card-header-complex">
               <h3>Aktivität</h3>
             </div>
-            <div class="timeline-container">
+            <div class="timeline-container scrollable-y">
                 <ul id="timelineList" class="timeline"></ul>
             </div>
           </section>
 
-          <section class="card">
+          <section class="card flex-col-card">
             <div class="card-header-complex">
               <h3>Kanäle</h3>
             </div>
@@ -137,7 +137,7 @@
       </div>
 
       <div id="tab-settings" class="tab-content">
-        <section class="card">
+        <section class="card scrollable-card">
           <div class="card-header-complex">
             <h3>Konfiguration</h3>
             <span id="settingsStatus" class="status-message" style="font-size:0.85rem"></span>
