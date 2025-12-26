@@ -268,21 +268,60 @@ if __name__ == "__main__":
                     service.state_store.record_error(f"Watchdog failure: {exc}")
                     continue
 
-        # handle logging stuff
+        def _logger_handlers(prefix: str) -> list[logging.Handler]:
+            handlers: list[logging.Handler] = []
+            if settings.headless:
+                stream_handler = logging.StreamHandler(sys.stdout)
+                stream_handler.setFormatter(
+                    logging.Formatter(f"[{prefix}] {{levelname}}: {{message}}", style="{")
+                )
+                handlers.append(stream_handler)
+            if settings.log:
+                handler = logging.FileHandler(LOG_PATH)
+                if prefix == "main":
+                    handler.setFormatter(FILE_FORMATTER)
+                else:
+                    handler.setFormatter(
+                        logging.Formatter(
+                            f"[{prefix}] {{asctime}}.{{msecs:03.0f}}:\t{{levelname:>7}}:\t{{message}}",
+                            style="{",
+                            datefmt="%Y-%m-%d %H:%M:%S",
+                        )
+                    )
+                handlers.append(handler)
+            return handlers
+
         if settings.logging_level > logging.DEBUG:
             # redirect the root logger into a NullHandler, effectively ignoring all logging calls
             # that aren't ours. This always runs, unless the main logging level is DEBUG or lower.
             logging.getLogger().addHandler(logging.NullHandler())
+
         logger = logging.getLogger("TwitchDrops")
         logger.setLevel(settings.logging_level)
-        if settings.headless:
-            stream_handler = logging.StreamHandler(sys.stdout)
-            stream_handler.setFormatter(logging.Formatter("{levelname}: {message}", style='{'))
-            logger.addHandler(stream_handler)
-        if settings.log:
-            handler = logging.FileHandler(LOG_PATH)
-            handler.setFormatter(FILE_FORMATTER)
+        logger.propagate = False
+        for handler in _logger_handlers("main"):
             logger.addHandler(handler)
+
+        watchdog_logger = logging.getLogger("TwitchDrops.watchdog")
+        watchdog_logger.setLevel(
+            settings.logging_watchdog_level
+            if settings.logging_watchdog_level is not None
+            else settings.logging_level
+        )
+        watchdog_logger.propagate = False
+        for handler in _logger_handlers("watchdog"):
+            watchdog_logger.addHandler(handler)
+
+        watch_logger = logging.getLogger("TwitchDrops.watch")
+        watch_logger.setLevel(
+            settings.logging_watch_level
+            if settings.logging_watch_level is not None
+            else settings.logging_level
+        )
+        watch_logger.propagate = False
+        for handler in _logger_handlers("watch"):
+            watch_logger.addHandler(handler)
+
         logging.getLogger("TwitchDrops.gql").setLevel(settings.debug_gql)
         logging.getLogger("TwitchDrops.websocket").setLevel(settings.debug_ws)
 
@@ -293,7 +332,7 @@ if __name__ == "__main__":
 
             api = build_api(service)
             await api.start(settings.bind)
-        watchdog_task = asyncio.create_task(watchdog_loop(service, logger))
+        watchdog_task = asyncio.create_task(watchdog_loop(service, watchdog_logger))
         try:
             exit_status = await service.start()
         finally:

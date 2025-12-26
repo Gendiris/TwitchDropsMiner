@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger("TwitchDrops")
+watch_logger = logging.getLogger("TwitchDrops.watch")
 
 
 class Stream:
@@ -449,7 +450,7 @@ class Channel:
             if isinstance(available_json, list):
                 available_json = available_json[0]
             if "error" in available_json:
-                logger.error(f"Send watch error: \"{available_json['error']}\"")
+                watch_logger.error(f"Send watch error: \"{available_json['error']}\"")
             return False
         # the list contains ~10-13 chunks of the stream at 2s intervals,
         # pick the last chunk URL available. Ensure it's not the end-of-stream tag,

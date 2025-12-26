@@ -24,6 +24,8 @@ class SettingsFile(TypedDict):
     enable_badges_emotes: bool
     available_drops_check: bool
     priority_mode: PriorityMode
+    logging_watchdog_level: int | None
+    logging_watch_level: int | None
 
 
 default_settings: SettingsFile = {
@@ -38,6 +40,8 @@ default_settings: SettingsFile = {
     "enable_badges_emotes": False,
     "available_drops_check": False,
     "priority_mode": PriorityMode.PRIORITY_ONLY,
+    "logging_watchdog_level": None,
+    "logging_watch_level": None,
 }
 
 
@@ -54,6 +58,8 @@ class Settings:
     debug_ws: int
     debug_gql: int
     logging_level: int
+    logging_watchdog_level: int | None
+    logging_watch_level: int | None
     # from settings file
     proxy: URL
     language: str
