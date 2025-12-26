@@ -13,7 +13,7 @@ const ui = {
   tabButtons: document.querySelectorAll('.nav-btn'),
   uptimeDisplay: document.getElementById("uptimeDisplay"),
   loadDisplay: document.getElementById("loadDisplay"),
-  lastReloadDisplay: document.getElementById("lastReloadDisplay"), // NEU
+  lastReloadDisplay: document.getElementById("lastReloadDisplay"),
   filterPriorityBtn: document.getElementById("filterPriorityBtn"),
   searchInput: document.getElementById("searchInput"),
   filterChips: document.querySelectorAll(".filter-chip"),
@@ -73,6 +73,21 @@ function updateUrl() {
     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
 }
 
+function formatTimelineDate(isoString) {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    const now = new Date();
+    const timeStr = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+    if (date.toDateString() === now.toDateString()) {
+        return timeStr;
+    } else {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        return `${day}.${month}. ${timeStr}`;
+    }
+}
+
 function renderRuntime(runtime) {
   if (ui.stateText) ui.stateText.textContent = runtime.state || "Unbekannt";
   const isWorking = ['MINING', 'WORKING'].includes(runtime.state);
@@ -100,7 +115,6 @@ function renderRuntime(runtime) {
     ui.pendingSwitchText.textContent = runtime.pending_switch ? `(Wechselt zu: ${runtime.pending_switch})` : "";
   }
 
-  // NEU: Last Reload Anzeige
   if (ui.lastReloadDisplay && runtime.last_reload) {
       const d = new Date(runtime.last_reload);
       ui.lastReloadDisplay.innerHTML = `<i class="fa-solid fa-rotate"></i> ${d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
@@ -126,13 +140,16 @@ function renderTimeline(journal) {
         const li = document.createElement("li");
         li.className = "timeline-entry";
         let icon = entry.icon ? entry.icon.replace("fa-", "") : "info";
+
+        const dateDisplay = formatTimelineDate(entry.time);
+
         li.innerHTML = `
             <div class="t-icon ${entry.type}">
                 <i class="fa-solid fa-${icon}"></i>
             </div>
             <div class="t-content">
                 <div class="t-msg">${entry.msg}</div>
-                <div class="t-time">${new Date(entry.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                <div class="t-time">${dateDisplay}</div>
             </div>`;
         ui.timelineList.appendChild(li);
     });
@@ -191,7 +208,8 @@ function renderTables(runtime) {
 
     let timeInfo = "";
     if (sortMode === 'last_seen' && c.last_seen) {
-        timeInfo = `<div style="font-size:0.7rem; color:var(--accent); margin-top:2px;"><i class="fa-solid fa-eye"></i> ${new Date(c.last_seen).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
+        const dateStr = formatTimelineDate(c.last_seen);
+        timeInfo = `<div style="font-size:0.7rem; color:var(--accent); margin-top:2px;"><i class="fa-solid fa-eye"></i> ${dateStr}</div>`;
     }
 
     const tr = document.createElement("tr");
