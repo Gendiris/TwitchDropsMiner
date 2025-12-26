@@ -1,4 +1,5 @@
 const refreshMs = 1000;
+const reloadEnabledStates = ['MINING', 'WORKING', 'RUNNING'];
 
 const ui = {
   settingsForm: document.getElementById("settingsForm"),
@@ -92,7 +93,7 @@ function formatTimelineDate(isoString) {
 
 function renderRuntime(runtime) {
   if (ui.stateText) ui.stateText.textContent = runtime.state || "Unbekannt";
-  const isWorking = ['MINING', 'WORKING'].includes(runtime.state);
+  const isWorking = reloadEnabledStates.includes(runtime.state);
 
   if (ui.reloadButton) ui.reloadButton.disabled = !isWorking;
 
@@ -119,10 +120,7 @@ function renderRuntime(runtime) {
     ui.pendingSwitchText.textContent = runtime.pending_switch ? `(Wechselt zu: ${runtime.pending_switch})` : "";
   }
 
-  if (ui.lastReloadDisplay && runtime.last_reload) {
-      const d = new Date(runtime.last_reload);
-      ui.lastReloadDisplay.innerHTML = `<i class="fa-solid fa-rotate"></i> ${d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
-  }
+  updateReloadTimestamp(runtime.last_reload);
 
   renderTimeline(runtime.journal || []);
 
@@ -254,10 +252,25 @@ function setReloadStatus(message, isError = false) {
     if (!ui.actionStatus) return;
     ui.actionStatus.textContent = message || '';
     ui.actionStatus.style.color = isError ? 'var(--danger)' : '';
+    if (message) {
+        setTimeout(() => {
+            if (ui.actionStatus.textContent === message) ui.actionStatus.textContent = '';
+        }, 4000);
+    }
+}
+
+function updateReloadTimestamp(value) {
+    if (!ui.lastReloadDisplay) return;
+    const timeNode = ui.lastReloadDisplay.querySelector('span') || ui.lastReloadDisplay;
+    if (!value) { timeNode.textContent = '--:--'; return; }
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) { timeNode.textContent = '--:--'; return; }
+    const timeStr = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    timeNode.textContent = timeStr;
 }
 
 function canReload() {
-    return lastRuntime && ['MINING', 'WORKING'].includes(lastRuntime.state);
+    return lastRuntime && reloadEnabledStates.includes(lastRuntime.state);
 }
 
 if (ui.reloadButton) ui.reloadButton.disabled = true;
@@ -289,10 +302,9 @@ if (ui.reloadButton) ui.reloadButton.onclick = async () => {
         const resp = await apiCall("/api/actions/reload", "POST");
         console.log('Reload erfolgreich', resp);
         setReloadStatus('Reload erfolgreich');
-        if (ui.lastReloadDisplay) {
-            const d = new Date();
-            ui.lastReloadDisplay.innerHTML = `<i class="fa-solid fa-rotate"></i> ${d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
-        }
+        const now = new Date();
+        lastRuntime = { ...(lastRuntime || {}), last_reload: now.toISOString() };
+        updateReloadTimestamp(now);
     } catch (err) {
         console.error('Reload fehlgeschlagen', err);
         setReloadStatus(`Reload fehlgeschlagen: ${err.message}`, true);
