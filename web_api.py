@@ -87,9 +87,13 @@ class WebAPI:
         return web.json_response(self._service.get_snapshot().get("settings", {}))
 
     async def _action_reload(self, _: web.Request) -> web.Response:
-        self._service.reload_state()
-        self._service.state_store.set_last_reload()
-        return web.json_response({"status": "queued"})
+        started = await self._service.reload()
+        if started:
+            self._service.state_store.set_last_reload()
+            status = "reloading"
+        else:
+            status = "already_reloading"
+        return web.json_response({"status": status})
 
     async def _action_start(self, _: web.Request) -> web.Response:
         was_started = self._service.ensure_started()
