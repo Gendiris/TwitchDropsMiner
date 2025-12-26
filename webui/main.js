@@ -1,5 +1,12 @@
 const refreshMs = 1000;
-const reloadEnabledStates = ['MINING', 'WORKING', 'RUNNING'];
+const reloadEnabledStates = [
+  'IDLE',
+  'INVENTORY_FETCH',
+  'GAMES_UPDATE',
+  'CHANNELS_FETCH',
+  'CHANNELS_CLEANUP',
+  'CHANNEL_SWITCH',
+];
 
 const ui = {
   settingsForm: document.getElementById("settingsForm"),
