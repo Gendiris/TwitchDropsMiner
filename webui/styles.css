@@ -154,7 +154,7 @@ html, body {
     grid-column: 1 / -1;
     display: flex;
     gap: 0.75rem;
-    height: 40px; /* Fixed minimal height for header */
+    min-height: 44px; /* Compact but allows meta chips to wrap */
 }
 
 /* Main Drop Area */
@@ -193,11 +193,20 @@ html, body {
     border: 1px solid var(--border);
     color: white;
     border-radius: 6px;
-    padding: 0 1rem;
+    padding: 0.4rem 0.9rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex: 1;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.hero-main {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
 }
 
 .status-indicator { display: flex; align-items: center; gap: 10px; }
@@ -211,6 +220,28 @@ html, body {
 
 .current-watch { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; }
 .watch-icon { color: var(--primary); }
+
+.hero-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.meta-chip {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.meta-chip.pending {
+    border-color: var(--warning);
+    color: #f8d27d;
+}
 
 /* Table Headers & Filters */
 .card-header-complex {

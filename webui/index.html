@@ -43,13 +43,20 @@
 
             <div class="header-area">
                 <section class="hero-card">
-                    <div class="status-indicator">
-                        <span class="pulse-dot" id="statusDot"></span>
-                        <h2 id="stateText">Status</h2>
+                    <div class="hero-main">
+                        <div class="status-indicator">
+                            <span class="pulse-dot" id="statusDot"></span>
+                            <h2 id="stateText">Status</h2>
+                        </div>
+                        <div class="current-watch">
+                            <i class="fa-solid fa-tv watch-icon"></i>
+                            <span id="watchingText">Warten...</span>
+                        </div>
                     </div>
-                    <div class="current-watch">
-                        <i class="fa-solid fa-tv watch-icon"></i>
-                        <span id="watchingText">Warten...</span>
+                    <div class="hero-meta">
+                        <span class="meta-chip" id="loadDisplay">Load: --</span>
+                        <span class="meta-chip" id="lastReloadDisplay">Letzter Reload: --</span>
+                        <span class="meta-chip pending" id="pendingSwitchText">Pending Switch</span>
                     </div>
                 </section>
             </div>
