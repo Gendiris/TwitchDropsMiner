@@ -240,7 +240,7 @@ function renderTables(runtime) {
     ui.channelsTable.innerHTML = "";
     (runtime.channels || []).forEach(ch => {
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${ch.login}</td><td style="color:${ch.status === 'online' ? 'var(--success)' : '#555'}">${ch.status}</td><td>${ch.drops_enabled ? '✅' : '❌'}</td>`;
+        tr.innerHTML = `<td>${ch.login}</td><td style="color:${ch.status === 'online' ? 'var(--success)' : '#555'}">${ch.status}</td><td style="text-align:center;">${ch.drops_enabled ? '✅' : '❌'}</td>`;
         ui.channelsTable.appendChild(tr);
     });
   }
