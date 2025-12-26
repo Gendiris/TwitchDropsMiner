@@ -450,6 +450,7 @@ td {
 .timeline-container {
   max-height: 200px;
   overflow-y: auto;
+  overflow-x: auto;
 }
 
 .timeline-entry {
@@ -491,15 +492,12 @@ td {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  overflow: hidden;
 }
 
 .t-msg {
   font-size: 0.8rem;
   color: var(--text-main);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .t-time {
