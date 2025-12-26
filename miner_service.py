@@ -5,6 +5,7 @@ import logging
 import signal
 import sys
 import traceback
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from translate import _
@@ -103,6 +104,16 @@ class MinerService:
     def reload_state(self) -> None:
         twitch = self._ensure_twitch()
         twitch.request_inventory_refresh(force=True)
+
+    def reload(self) -> None:
+        self.reload_state()
+
+    def expected_refresh_interval(self) -> timedelta:
+        twitch = self._ensure_twitch()
+        interval = getattr(twitch, "_inventory_ttl_max", timedelta(minutes=20))
+        if isinstance(interval, timedelta):
+            return interval
+        return timedelta(minutes=20)
 
     def switch_channel(self, channel_ref: int | str | None = None) -> None:
         """
