@@ -11,9 +11,11 @@ if __name__ == "__main__":
     import io
     import sys
     import argparse
+    import contextlib
     import traceback
     import warnings
     from pathlib import Path
+    from datetime import datetime, timezone, timedelta
     from typing import NoReturn, TYPE_CHECKING
 
     import truststore
@@ -31,6 +33,7 @@ if __name__ == "__main__":
         LOG_PATH,
         LOCK_PATH,
         set_paths,
+        State,
     )
 
     if TYPE_CHECKING:
@@ -188,6 +191,83 @@ if __name__ == "__main__":
             # this language doesn't exist - stick to English
             pass
 
+        async def watchdog_loop(service: MinerService, logger: logging.Logger) -> None:
+            check_interval = max(
+                60.0,
+                min(service.expected_refresh_interval().total_seconds() / 3, 300.0),
+            )
+            consecutive_exceedances = 0
+            while True:
+                try:
+                    await asyncio.sleep(check_interval)
+                    snapshot = service.get_snapshot()
+                    runtime = snapshot.get("runtime", {})
+                    state_name = runtime.get("state")
+                    is_active = (
+                        service.is_running
+                        and state_name is not None
+                        and state_name != State.EXIT.name
+                    )
+
+                    last_reload_raw = runtime.get("last_reload")
+                    last_reload = None
+                    if isinstance(last_reload_raw, str):
+                        try:
+                            last_reload = datetime.fromisoformat(last_reload_raw)
+                        except ValueError:
+                            last_reload = None
+
+                    now = datetime.now(timezone.utc)
+                    base_interval = service.expected_refresh_interval()
+                    buffer = timedelta(seconds=max(300, base_interval.total_seconds() * 0.25))
+                    threshold = base_interval + buffer
+                    diff = (now - last_reload) if last_reload else None
+                    exceeded = bool(diff and diff > threshold)
+
+                    if not is_active:
+                        consecutive_exceedances = 0
+                        action = "inactive"
+                    elif last_reload is None:
+                        consecutive_exceedances = 0
+                        action = "no_timestamp"
+                    elif exceeded:
+                        consecutive_exceedances += 1
+                        action = "hysteresis"
+                    else:
+                        consecutive_exceedances = 0
+                        action = "within_threshold"
+
+                    should_reload = exceeded and consecutive_exceedances >= 2
+                    consecutive_for_log = consecutive_exceedances
+                    if should_reload:
+                        action = "reload"
+                        service.reload()
+                        consecutive_exceedances = 0
+
+                    diff_minutes = diff.total_seconds() / 60 if diff else None
+                    threshold_minutes = threshold.total_seconds() / 60
+                    log_msg = (
+                        "Watchdog: state=%s, idle=%s, threshold=%.2fm, "
+                        "consecutive=%d, action=%s"
+                    ) % (
+                        state_name or "unknown",
+                        f"{diff_minutes:.2f}m" if diff_minutes is not None else "n/a",
+                        threshold_minutes,
+                        consecutive_for_log,
+                        action,
+                    )
+                    if should_reload or exceeded:
+                        logger.warning(log_msg)
+                    else:
+                        logger.info(log_msg)
+                    service.state_store.record_error(log_msg)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.exception("Watchdog loop failed: %s", exc)
+                    service.state_store.record_error(f"Watchdog failure: {exc}")
+                    continue
+
         # handle logging stuff
         if settings.logging_level > logging.DEBUG:
             # redirect the root logger into a NullHandler, effectively ignoring all logging calls
@@ -213,9 +293,13 @@ if __name__ == "__main__":
 
             api = build_api(service)
             await api.start(settings.bind)
+        watchdog_task = asyncio.create_task(watchdog_loop(service, logger))
         try:
             exit_status = await service.start()
         finally:
+            watchdog_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await watchdog_task
             if api is not None:
                 await api.stop()
         sys.exit(exit_status)
