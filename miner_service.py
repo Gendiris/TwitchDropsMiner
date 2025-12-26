@@ -37,6 +37,8 @@ class MinerService:
         self._task: asyncio.Task[int] | None = None
         self._requested_channel: int | str | None = None
         self._exit_status: int = 0
+        self._reloading: bool = False
+        self._reload_lock = asyncio.Lock()
 
     @property
     def twitch(self) -> Twitch | None:
@@ -105,8 +107,26 @@ class MinerService:
         twitch = self._ensure_twitch()
         twitch.request_inventory_refresh(force=True)
 
-    def reload(self) -> None:
-        self.reload_state()
+    async def reload(self) -> bool:
+        if self._reloading:
+            return False
+        async with self._reload_lock:
+            if self._reloading:
+                return False
+            self._reloading = True
+            try:
+                was_running = self.is_running
+                twitch = self._twitch
+                if twitch is not None:
+                    twitch.request_stop()
+                await self.stop()
+                self._twitch = None
+                twitch = self._ensure_twitch()
+                if was_running:
+                    self._task = asyncio.create_task(self._run(twitch))
+                return True
+            finally:
+                self._reloading = False
 
     def expected_refresh_interval(self) -> timedelta:
         twitch = self._ensure_twitch()
