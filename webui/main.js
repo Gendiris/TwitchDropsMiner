@@ -13,6 +13,7 @@ const ui = {
   tabButtons: document.querySelectorAll('.nav-btn'),
   uptimeDisplay: document.getElementById("uptimeDisplay"),
   loadDisplay: document.getElementById("loadDisplay"),
+  lastReloadDisplay: document.getElementById("lastReloadDisplay"), // NEU
   filterPriorityBtn: document.getElementById("filterPriorityBtn"),
   searchInput: document.getElementById("searchInput"),
   filterChips: document.querySelectorAll(".filter-chip"),
@@ -97,6 +98,12 @@ function renderRuntime(runtime) {
 
   if (ui.pendingSwitchText) {
     ui.pendingSwitchText.textContent = runtime.pending_switch ? `(Wechselt zu: ${runtime.pending_switch})` : "";
+  }
+
+  // NEU: Last Reload Anzeige
+  if (ui.lastReloadDisplay && runtime.last_reload) {
+      const d = new Date(runtime.last_reload);
+      ui.lastReloadDisplay.innerHTML = `<i class="fa-solid fa-rotate"></i> ${d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
   }
 
   renderTimeline(runtime.journal || []);

@@ -33,7 +33,7 @@ class StateStore:
             "watching": None,
             "channels": [],
             "campaigns": [],
-            "last_reload": None,
+            "last_reload": self._isoformat(datetime.now(timezone.utc)),
             "errors": [],
             "journal": self._load_journal(),
             "pending_switch": None,
@@ -95,12 +95,13 @@ class StateStore:
     def _channel_payload(channel: "Channel" | None) -> dict[str, Any] | None:
         if channel is None: return None
         status = "online" if channel.online else ("pending_online" if channel.pending_online else "offline")
+        game_name = channel.game.name if (channel.game and hasattr(channel.game, 'name')) else "?"
         return {
             "id": channel.id,
             "login": channel._login,
             "display_name": channel.name,
             "status": status,
-            "game": channel.game and channel.game.name,
+            "game": game_name,
             "viewers": channel.viewers,
             "drops_enabled": channel.drops_enabled,
         }
@@ -120,11 +121,12 @@ class StateStore:
         }
 
     def _campaign_payload(self, campaign: "DropsCampaign") -> dict[str, Any]:
-        last_seen_dt = self._game_last_seen.get(campaign.game.name)
+        g_name = campaign.game.name if campaign.game else "Unknown"
+        last_seen_dt = self._game_last_seen.get(g_name)
         return {
             "id": campaign.id,
             "name": campaign.name,
-            "game": campaign.game.name,
+            "game": g_name,
             "eligible": campaign.eligible,
             "active": campaign.active,
             "upcoming": campaign.upcoming,
@@ -145,17 +147,18 @@ class StateStore:
         with self._lock:
             current_login = channel._login if channel else None
 
+            # Safe Game Name extraction
+            game_name = "?"
+            if channel and channel.game:
+                game_name = channel.game.name
+                self._game_last_seen[game_name] = datetime.now(timezone.utc)
+
             if current_login != self._last_watching_login:
                 if current_login:
-                    self._add_journal_entry("switch",
-                                            f"Kanal gewechselt: {channel.name} ({channel.game.name if channel.game else '?'})",
-                                            "fa-tv")
+                    self._add_journal_entry("switch", f"Kanal gewechselt: {channel.name} ({game_name})", "fa-tv")
                 else:
                     self._add_journal_entry("info", "Stream gestoppt / Suche...", "fa-pause")
                 self._last_watching_login = current_login
-
-            if channel and channel.game:
-                self._game_last_seen[channel.game.name] = datetime.now(timezone.utc)
 
             self._runtime["watching"] = self._channel_payload(channel)
 
@@ -167,21 +170,26 @@ class StateStore:
         with self._lock:
             payload_list = []
             for c in campaigns:
-                payload_list.append(self._campaign_payload(c))
+                try:
+                    payload_list.append(self._campaign_payload(c))
 
-                if not self._first_campaign_load:
-                    for d in c.drops:
-                        claim_key = f"DROP ERHALTEN: {d.name} ({c.game.name})"
-                        if d.is_claimed and claim_key not in self._known_claims:
-                            self._add_journal_entry("claim", claim_key, "fa-gift")
-                            self._known_claims.add(claim_key)
-                        elif d.is_claimed:
-                            self._known_claims.add(claim_key)
-                else:
-                    for d in c.drops:
-                        claim_key = f"DROP ERHALTEN: {d.name} ({c.game.name})"
-                        if d.is_claimed:
-                            self._known_claims.add(claim_key)
+                    if not self._first_campaign_load:
+                        g_name = c.game.name if c.game else "?"
+                        for d in c.drops:
+                            claim_key = f"DROP ERHALTEN: {d.name} ({g_name})"
+                            if d.is_claimed and claim_key not in self._known_claims:
+                                self._add_journal_entry("claim", claim_key, "fa-gift")
+                                self._known_claims.add(claim_key)
+                            elif d.is_claimed:
+                                self._known_claims.add(claim_key)
+                    else:
+                        g_name = c.game.name if c.game else "?"
+                        for d in c.drops:
+                            if d.is_claimed:
+                                claim_key = f"DROP ERHALTEN: {d.name} ({g_name})"
+                                self._known_claims.add(claim_key)
+                except Exception:
+                    continue
 
             self._first_campaign_load = False
             self._runtime["campaigns"] = payload_list
@@ -197,7 +205,6 @@ class StateStore:
     def record_error(self, message: str) -> None:
         with self._lock:
             self._add_journal_entry("error", message, "fa-exclamation-triangle")
-
             errors: list[str] = self._runtime["errors"]
             errors.append(message)
             self._runtime["errors"] = errors[-10:]
