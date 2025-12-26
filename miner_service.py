@@ -39,6 +39,9 @@ class MinerService:
         self._exit_status: int = 0
         self._reloading: bool = False
         self._reload_lock = asyncio.Lock()
+        self._start_lock = asyncio.Lock()
+        self._stop_requested = False
+        self._restartable_error = False
 
     @property
     def twitch(self) -> Twitch | None:
@@ -58,17 +61,19 @@ class MinerService:
     def state_store(self) -> StateStore:
         return self._state_store
 
-    def ensure_started(self) -> bool:
+    async def ensure_started(self) -> bool:
         """
         Start the miner loop if it is not already running.
 
         Returns True if a new task was created.
         """
-        if self._task is None or self._task.done():
-            twitch = self._ensure_twitch()
-            self._task = asyncio.create_task(self._run(twitch))
-            return True
-        return False
+        async with self._start_lock:
+            if self._task is None or self._task.done():
+                twitch = self._ensure_twitch()
+                self._stop_requested = False
+                self._task = asyncio.create_task(self._supervise(twitch))
+                return True
+            return False
 
     def _ensure_twitch(self) -> Twitch:
         if self._twitch is None:
@@ -85,14 +90,16 @@ class MinerService:
         """
         Start the miner lifecycle and return the resulting exit status.
         """
-        self.ensure_started()
+        await self.ensure_started()
         assert self._task is not None
         return await self._task
 
-    async def stop(self) -> None:
+    async def stop(self, *, manual: bool = True) -> None:
         twitch = self._twitch
         if twitch is None:
             return
+        if manual:
+            self._stop_requested = True
         twitch.close()
         if self._task is not None:
             await asyncio.shield(self._task)
@@ -101,6 +108,7 @@ class MinerService:
         twitch = self._twitch
         if twitch is None:
             return
+        self._stop_requested = True
         twitch.close()
 
     def reload_state(self) -> None:
@@ -119,11 +127,12 @@ class MinerService:
                 twitch = self._twitch
                 if twitch is not None:
                     twitch.request_stop()
-                await self.stop()
+                await self.stop(manual=False)
                 self._twitch = None
+                self._stop_requested = False
                 twitch = self._ensure_twitch()
                 if was_running:
-                    self._task = asyncio.create_task(self._run(twitch))
+                    self._task = asyncio.create_task(self._supervise(twitch))
                 return True
             finally:
                 self._reloading = False
@@ -170,8 +179,32 @@ class MinerService:
         self._state_store.update_settings(self.settings)
         return self._state_store.get_snapshot()
 
+    async def _supervise(self, client: Twitch) -> int:
+        attempt = 0
+        while not self._stop_requested:
+            result = await self._run(client)
+            if self._stop_requested or self._exit_status == 0 or not self._restartable_error:
+                return result
+            attempt += 1
+            backoff_seconds = min(30.0, 2.0**attempt)
+            restart_message = (
+                f"Unexpected miner exit detected (attempt {attempt}); restarting in "
+                f"{backoff_seconds:.1f}s"
+            )
+            self._state_store.record_restart_attempt(restart_message)
+            logger.warning(restart_message)
+            try:
+                await asyncio.sleep(backoff_seconds)
+            except asyncio.CancelledError:
+                self._stop_requested = True
+                break
+            self._twitch = None
+            client = self._ensure_twitch()
+        return self._exit_status
+
     async def _run(self, client: Twitch) -> int:
         self._exit_status = 0
+        self._restartable_error = False
         loop = asyncio.get_running_loop()
         if sys.platform == "linux":
             loop.add_signal_handler(signal.SIGINT, lambda *_: client.gui.close())
@@ -190,6 +223,7 @@ class MinerService:
             client.print("Authentication cookies are missing. Please provide cookies.jar.")
         except Exception:
             self._exit_status = 1
+            self._restartable_error = True
             self._state_store.record_error("Fatal error encountered")
             client.prevent_close()
             client.print("Fatal error encountered:\n")

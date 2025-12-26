@@ -209,6 +209,10 @@ class StateStore:
             errors.append(message)
             self._runtime["errors"] = errors[-10:]
 
+    def record_restart_attempt(self, message: str) -> None:
+        with self._lock:
+            self._add_journal_entry("restart", message, "fa-redo")
+
     def get_snapshot(self) -> dict[str, Any]:
         with self._lock:
             if "started_at" not in self._runtime:
