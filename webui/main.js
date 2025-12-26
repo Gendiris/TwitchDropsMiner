@@ -204,13 +204,14 @@ function renderTables(runtime) {
     let dropsHtml = '<div class="drops-list">';
     (c.drops || []).forEach(d => {
         let pct = Math.min(100, (d.current_minutes / d.required_minutes) * 100 || 0);
+        const progressClass = d.claimed ? 'progress-bar claimed' : 'progress-bar';
         dropsHtml += `
             <div class="drop-item">
                 <div class="drop-header">
                     <span class="drop-name">${d.name} ${d.claimed ? '✅' : ''}</span>
                     <span class="drop-mins">${d.current_minutes}/${d.required_minutes}m</span>
                 </div>
-                <div class="progress-container"><div class="progress-fill" style="width:${pct}%; background:${d.claimed ? 'var(--success)':'var(--accent)'}"></div></div>
+                <div class="progress-container"><div class="${progressClass}" style="width:${pct}%;"></div></div>
             </div>`;
     });
     dropsHtml += '</div>';

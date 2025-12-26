@@ -282,6 +282,10 @@ tbody td {
     display: block !important; /* Erzwinge Anzeige */
 }
 
+.progress-bar.claimed {
+    background-color: var(--success);
+}
+
 /* Timeline specific */
 .timeline-container { overflow-y: auto; flex: 1; min-height: 0; }
 .timeline li { padding: 4px 0; border-bottom: 1px solid #333; font-size: 0.8rem; }
