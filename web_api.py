@@ -96,7 +96,7 @@ class WebAPI:
         return web.json_response({"status": status})
 
     async def _action_start(self, _: web.Request) -> web.Response:
-        was_started = self._service.ensure_started()
+        was_started = await self._service.ensure_started()
         status = "started" if was_started else "already_running"
         return web.json_response({"status": status})
 
