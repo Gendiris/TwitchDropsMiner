@@ -366,9 +366,52 @@ tbody td {
 }
 
 /* Timeline specific */
-.timeline-container { overflow-y: auto; flex: 1; min-height: 0; }
-.timeline li { padding: 4px 0; border-bottom: 1px solid #333; font-size: 0.8rem; }
-.timeline-time { color: var(--primary); font-family: monospace; }
+.timeline-container {
+    overflow-y: auto;
+    overflow-x: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0 4px 0 0;
+}
+
+.timeline-entry {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 4px 0;
+    border-bottom: 1px solid #333;
+    font-size: 0.8rem;
+}
+
+.t-icon {
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+    color: var(--primary);
+}
+
+.t-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.t-msg {
+    white-space: nowrap;
+    overflow-x: auto;
+}
+
+.t-time, .timeline-time {
+    color: var(--primary);
+    font-family: monospace;
+    font-size: 0.75rem;
+}
 
 /* Scrollbars */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
