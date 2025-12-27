@@ -360,6 +360,7 @@ html, body {
     min-height: 0;
     background: rgba(0,0,0,0.1);
     border-radius: 4px;
+    padding: 0.35rem;
 }
 
 table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
@@ -410,6 +411,7 @@ tbody td {
     overflow-x: auto;
     flex: 1;
     min-height: 0;
+    padding: 0.35rem;
 }
 
 .timeline {
@@ -453,7 +455,17 @@ tbody td {
 }
 
 @media (max-width: 900px) {
-    html, body { overflow-y: auto; }
+    html, body {
+        overflow-y: auto;
+        overflow-x: hidden;
+        height: auto;
+        min-height: 100%;
+    }
+
+    .app-container {
+        height: auto;
+        min-height: 100vh;
+    }
 
     .topbar {
         position: sticky;
@@ -490,7 +502,63 @@ tbody td {
 
     .nav-btn { width: 100%; justify-content: flex-start; }
 
-    .content { padding: 0.75rem; }
+    .content {
+        padding: 0.75rem;
+        overflow: visible;
+    }
+
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+        height: auto;
+        gap: 0.65rem;
+    }
+
+    .drops-area {
+        grid-column: 1;
+        grid-row: 2;
+    }
+
+    .info-area {
+        grid-column: 1;
+        grid-row: 3;
+    }
+
+    .hero-card {
+        align-items: flex-start;
+        padding: 0.65rem 0.85rem;
+    }
+
+    .hero-meta {
+        width: 100%;
+        font-size: 0.85rem;
+    }
+
+    .meta-chip {
+        white-space: normal;
+    }
+
+    table {
+        font-size: 0.9rem;
+    }
+
+    thead th,
+    tbody td {
+        padding: 8px;
+    }
+
+    .table-wrapper {
+        padding: 0.5rem;
+    }
+
+    .timeline-container {
+        padding: 0.5rem;
+    }
+
+    .timeline-entry {
+        font-size: 0.85rem;
+        padding: 6px 0;
+    }
 }
 
 /* Scrollbars */
