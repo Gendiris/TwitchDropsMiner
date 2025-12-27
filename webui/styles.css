@@ -124,6 +124,20 @@ html, body {
 }
 .reload-btn:hover { background: var(--primary-hover); }
 
+.icon-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-btn:hover { border-color: var(--primary); color: white; }
+
 .topbar-actions {
     display: flex;
     align-items: center;

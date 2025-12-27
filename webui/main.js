@@ -56,8 +56,7 @@ function applyUrlParams() {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get('tab');
     if (tabParam) {
-        const btn = document.querySelector(`.nav-btn[data-tab="${tabParam}"]`);
-        if (btn) btn.click();
+        activateTab(tabParam);
     }
     const searchParam = params.get('search');
     if (searchParam && ui.searchInput) { ui.searchInput.value = searchParam; filterSearch = searchParam.toLowerCase(); }
@@ -304,14 +303,20 @@ window.addEventListener('resize', () => {
     if (window.innerWidth > 900) setNavState(false);
 });
 
-ui.tabButtons.forEach(btn => btn.onclick = () => {
-    ui.tabButtons.forEach(b => b.classList.remove('active'));
+function activateTab(tabName) {
+    const targetBtn = Array.from(ui.tabButtons).find(b => b.dataset.tab === tabName);
+    ui.tabButtons.forEach(b => b.classList.toggle('active', b === targetBtn));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+    const tabContent = document.getElementById(`tab-${tabName}`);
+    if (tabContent) tabContent.classList.add('active');
     closeNavForMobile();
     updateUrl();
-});
+}
+
+ui.tabButtons.forEach(btn => btn.onclick = () => activateTab(btn.dataset.tab));
+
+const settingsShortcut = document.getElementById('settingsShortcut');
+if (settingsShortcut) settingsShortcut.onclick = () => activateTab('settings');
 
 ui.filterChips.forEach(chip => chip.onclick = () => {
     ui.filterChips.forEach(c => c.classList.remove('active'));
