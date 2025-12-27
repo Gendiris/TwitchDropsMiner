@@ -478,7 +478,8 @@ tbody td {
 
     .app-container {
         height: auto;
-        min-height: 100vh;
+        min-height: 100%;
+        overflow: visible;
     }
 
     .topbar {
@@ -519,6 +520,7 @@ tbody td {
     .content {
         padding: 0.75rem;
         overflow: visible;
+        height: auto;
     }
 
     .dashboard-grid {
@@ -526,6 +528,7 @@ tbody td {
         grid-template-rows: auto auto auto;
         height: auto;
         gap: 0.65rem;
+        overflow: visible;
     }
 
     .drops-area {
@@ -536,6 +539,13 @@ tbody td {
     .info-area {
         grid-column: 1;
         grid-row: 3;
+        overflow: visible;
+        gap: 0.65rem;
+    }
+
+    .info-area > .card {
+        flex: 0 0 auto !important;
+        min-height: auto;
     }
 
     .hero-card {
