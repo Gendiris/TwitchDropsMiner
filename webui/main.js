@@ -315,9 +315,6 @@ function activateTab(tabName) {
 
 ui.tabButtons.forEach(btn => btn.onclick = () => activateTab(btn.dataset.tab));
 
-const settingsShortcut = document.getElementById('settingsShortcut');
-if (settingsShortcut) settingsShortcut.onclick = () => activateTab('settings');
-
 ui.filterChips.forEach(chip => chip.onclick = () => {
     ui.filterChips.forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
