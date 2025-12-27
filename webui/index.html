@@ -10,12 +10,28 @@
 <body>
 
   <div class="app-container">
-    <nav class="sidebar">
-      <div class="brand">
-        <i class="fa-solid fa-cube"></i>
-        <span>Drops Miner</span>
+    <header class="topbar">
+      <div class="topbar-left">
+        <button id="menuToggle" class="menu-toggle" aria-label="Navigation umschalten" aria-expanded="false">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <div class="brand">
+          <i class="fa-solid fa-cube"></i>
+          <span>Drops Miner</span>
+        </div>
       </div>
+      <div class="topbar-actions">
+        <div id="uptimeDisplay" class="uptime-chip"><i class="fa-regular fa-clock"></i> 00:00</div>
+        <div class="reload-control">
+          <button id="reloadButton" data-action="reload" class="reload-btn">
+            <i class="fa-solid fa-rotate"></i> Reload
+          </button>
+        </div>
+        <div id="actionStatus" class="status-message"></div>
+      </div>
+    </header>
 
+    <nav class="nav-panel" id="navPanel">
       <div class="nav-links">
         <button class="nav-btn active" data-tab="dashboard">
           <i class="fa-solid fa-chart-line"></i> <span>Dashboard</span>
@@ -23,16 +39,6 @@
         <button class="nav-btn" data-tab="settings">
           <i class="fa-solid fa-gear"></i> <span>Settings</span>
         </button>
-      </div>
-
-      <div class="footer-info">
-        <div id="uptimeDisplay"><i class="fa-regular fa-clock"></i> 00:00</div>
-        <div class="reload-control">
-          <button id="reloadButton" data-action="reload" class="reload-btn">
-            <i class="fa-solid fa-rotate"></i> Reload
-          </button>
-        </div>
-        <div id="actionStatus" class="status-message"></div>
       </div>
     </nav>
 
