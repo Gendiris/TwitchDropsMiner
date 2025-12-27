@@ -30,7 +30,8 @@ const ui = {
   searchInput: document.getElementById("searchInput"),
   filterChips: document.querySelectorAll(".filter-chip"),
   sortSelect: document.getElementById("sortSelect"),
-  dropsCounter: document.getElementById("dropsCounter")
+  dropsCounter: document.getElementById("dropsCounter"),
+  logFilterSelect: document.getElementById("logFilterSelect")
 };
 
 let startTime = null;
@@ -40,6 +41,7 @@ let filterMode = 'all';
 let filterSearch = '';
 let sortMode = 'priority';
 let navOpen = false;
+let logFilterMode = localStorage.getItem('logFilterMode') || 'hide-watchdog';
 
 async function apiCall(path, method = "GET", payload = null) {
   const options = { method, headers: { "Content-Type": "application/json" } };
@@ -147,7 +149,14 @@ function renderRuntime(runtime) {
 function renderTimeline(journal) {
     if (!journal || !ui.timelineList) return;
     ui.timelineList.innerHTML = "";
-    journal.forEach(entry => {
+    const filtered = journal.filter(entry => {
+        if (logFilterMode === 'all') return true;
+        const msg = (entry.msg || '').toLowerCase();
+        const isWatchdog = entry.type === 'watchdog' || msg.startsWith('watchdog:') || msg.startsWith('[watchdog]');
+        return !isWatchdog;
+    });
+
+    filtered.forEach(entry => {
         const li = document.createElement("li");
         li.className = "timeline-entry";
         let icon = entry.icon ? entry.icon.replace("fa-", "") : "info";
@@ -302,6 +311,15 @@ if (ui.menuToggle) {
 window.addEventListener('resize', () => {
     if (window.innerWidth > 900) setNavState(false);
 });
+
+if (ui.logFilterSelect) {
+    ui.logFilterSelect.value = logFilterMode;
+    ui.logFilterSelect.onchange = (e) => {
+        logFilterMode = e.target.value;
+        localStorage.setItem('logFilterMode', logFilterMode);
+        if (lastRuntime && lastRuntime.journal) renderTimeline(lastRuntime.journal);
+    };
+}
 
 function activateTab(tabName) {
     const targetBtn = Array.from(ui.tabButtons).find(b => b.dataset.tab === tabName);
