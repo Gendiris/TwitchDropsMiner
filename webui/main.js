@@ -19,6 +19,8 @@ const ui = {
   channelsTable: document.querySelector("#channelsTable tbody"),
   campaignsTable: document.querySelector("#campaignsTable tbody"),
   tabButtons: document.querySelectorAll('.nav-btn'),
+  navPanel: document.getElementById("navPanel"),
+  menuToggle: document.getElementById("menuToggle"),
   uptimeDisplay: document.getElementById("uptimeDisplay"),
   loadDisplay: document.getElementById("loadDisplay"),
   lastReloadDisplay: document.getElementById("lastReloadDisplay"),
@@ -37,6 +39,7 @@ let currentPriority = [];
 let filterMode = 'all';
 let filterSearch = '';
 let sortMode = 'priority';
+let navOpen = false;
 
 async function apiCall(path, method = "GET", payload = null) {
   const options = { method, headers: { "Content-Type": "application/json" } };
@@ -283,11 +286,30 @@ function canReload() {
 
 if (ui.reloadButton) ui.reloadButton.disabled = true;
 
+function setNavState(isOpen) {
+    navOpen = isOpen;
+    document.body.classList.toggle('nav-open', isOpen);
+    if (ui.menuToggle) ui.menuToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+}
+
+function closeNavForMobile() {
+    if (window.innerWidth <= 900) setNavState(false);
+}
+
+if (ui.menuToggle) {
+    ui.menuToggle.onclick = () => setNavState(!navOpen);
+}
+
+window.addEventListener('resize', () => {
+    if (window.innerWidth > 900) setNavState(false);
+});
+
 ui.tabButtons.forEach(btn => btn.onclick = () => {
     ui.tabButtons.forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+    closeNavForMobile();
     updateUrl();
 });
 
