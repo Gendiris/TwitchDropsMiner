@@ -31,7 +31,6 @@ const ui = {
   filterChips: document.querySelectorAll(".filter-chip"),
   sortSelect: document.getElementById("sortSelect"),
   dropsCounter: document.getElementById("dropsCounter"),
-  logFilterSelect: document.getElementById("logFilterSelect"),
   watchdogList: document.getElementById("watchdogList")
 };
 
@@ -42,7 +41,6 @@ let filterMode = 'all';
 let filterSearch = '';
 let sortMode = 'priority';
 let navOpen = false;
-let logFilterMode = localStorage.getItem('logFilterMode') || 'hide-watchdog';
 
 async function apiCall(path, method = "GET", payload = null) {
   const options = { method, headers: { "Content-Type": "application/json" } };
@@ -152,12 +150,7 @@ function renderRuntime(runtime) {
 function renderTimeline(journal) {
     if (!journal || !ui.timelineList) return;
     ui.timelineList.innerHTML = "";
-    const filtered = journal.filter(entry => {
-        if (logFilterMode === 'all') return true;
-        return !isWatchdogEntry(entry);
-    });
-
-    filtered.forEach(entry => {
+    journal.forEach(entry => {
         const li = document.createElement("li");
         li.className = "timeline-entry";
         let icon = entry.icon ? entry.icon.replace("fa-", "") : "info";
@@ -339,18 +332,6 @@ if (ui.menuToggle) {
 window.addEventListener('resize', () => {
     if (window.innerWidth > 900) setNavState(false);
 });
-
-if (ui.logFilterSelect) {
-    ui.logFilterSelect.value = logFilterMode;
-    ui.logFilterSelect.onchange = (e) => {
-        logFilterMode = e.target.value;
-        localStorage.setItem('logFilterMode', logFilterMode);
-        if (lastRuntime && lastRuntime.journal) {
-            renderTimeline(lastRuntime.journal);
-            renderWatchdogTimeline(lastRuntime.journal);
-        }
-    };
-}
 
 function activateTab(tabName) {
     const targetBtn = Array.from(ui.tabButtons).find(b => b.dataset.tab === tabName);
