@@ -387,6 +387,7 @@ html, body {
 /* Tables */
 .table-wrapper {
     overflow-y: auto;
+    overflow-x: auto;
     flex: 1;
     min-height: 0;
     background: rgba(0,0,0,0.1);
@@ -488,7 +489,7 @@ tbody td {
 @media (max-width: 900px) {
     html, body {
         overflow-y: auto;
-        overflow-x: hidden;
+        overflow-x: auto;
         height: auto;
         min-height: 100%;
     }
