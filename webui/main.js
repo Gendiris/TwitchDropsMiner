@@ -31,7 +31,8 @@ const ui = {
   filterChips: document.querySelectorAll(".filter-chip"),
   sortSelect: document.getElementById("sortSelect"),
   dropsCounter: document.getElementById("dropsCounter"),
-  logFilterSelect: document.getElementById("logFilterSelect")
+  logFilterSelect: document.getElementById("logFilterSelect"),
+  watchdogList: document.getElementById("watchdogList")
 };
 
 let startTime = null;
@@ -133,7 +134,9 @@ function renderRuntime(runtime) {
 
   updateReloadTimestamp(runtime.last_reload);
 
-  renderTimeline(runtime.journal || []);
+  const journal = runtime.journal || [];
+  renderTimeline(journal);
+  renderWatchdogTimeline(journal);
 
   if (runtime.sys_load && ui.loadDisplay) {
       ui.loadDisplay.innerHTML = `<i class="fa-solid fa-microchip"></i> ${runtime.sys_load}`;
@@ -151,9 +154,7 @@ function renderTimeline(journal) {
     ui.timelineList.innerHTML = "";
     const filtered = journal.filter(entry => {
         if (logFilterMode === 'all') return true;
-        const msg = (entry.msg || '').toLowerCase();
-        const isWatchdog = entry.type === 'watchdog' || msg.startsWith('watchdog:') || msg.startsWith('[watchdog]');
-        return !isWatchdog;
+        return !isWatchdogEntry(entry);
     });
 
     filtered.forEach(entry => {
@@ -173,6 +174,33 @@ function renderTimeline(journal) {
             </div>`;
         ui.timelineList.appendChild(li);
     });
+}
+
+function renderWatchdogTimeline(journal) {
+    if (!ui.watchdogList) return;
+    ui.watchdogList.innerHTML = "";
+    const watchdogEntries = (journal || []).filter(isWatchdogEntry);
+
+    watchdogEntries.forEach(entry => {
+        const li = document.createElement("li");
+        li.className = "timeline-entry";
+        let icon = entry.icon ? entry.icon.replace("fa-", "") : "shield";
+        const dateDisplay = formatTimelineDate(entry.time);
+        li.innerHTML = `
+            <div class="t-icon ${entry.type}">
+                <i class="fa-solid fa-${icon}"></i>
+            </div>
+            <div class="t-content">
+                <div class="t-msg">${entry.msg}</div>
+                <div class="t-time">${dateDisplay}</div>
+            </div>`;
+        ui.watchdogList.appendChild(li);
+    });
+}
+
+function isWatchdogEntry(entry) {
+    const msg = (entry.msg || '').toLowerCase();
+    return entry.type === 'watchdog' || msg.startsWith('watchdog:') || msg.startsWith('[watchdog]');
 }
 
 function getCampaignProgress(c) {
@@ -317,7 +345,10 @@ if (ui.logFilterSelect) {
     ui.logFilterSelect.onchange = (e) => {
         logFilterMode = e.target.value;
         localStorage.setItem('logFilterMode', logFilterMode);
-        if (lastRuntime && lastRuntime.journal) renderTimeline(lastRuntime.journal);
+        if (lastRuntime && lastRuntime.journal) {
+            renderTimeline(lastRuntime.journal);
+            renderWatchdogTimeline(lastRuntime.journal);
+        }
     };
 }
 
