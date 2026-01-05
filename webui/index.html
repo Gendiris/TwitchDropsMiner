@@ -101,21 +101,33 @@
             </section>
 
             <div class="info-area">
-                <section class="card" style="flex: 1; min-height: 0;">
-                    <div class="card-header-complex">
-                        <h3>Log</h3>
-                        <div class="log-filter">
-                            <label for="logFilterSelect" style="font-size:0.8rem; color:var(--text-muted); margin-right:4px;">Filter</label>
-                            <select id="logFilterSelect">
-                                <option value="hide-watchdog">Watchdog ausblenden</option>
-                                <option value="all">Alle anzeigen</option>
-                            </select>
+                <div class="logs-area">
+                    <section class="card" style="flex: 1; min-height: 0;">
+                        <div class="card-header-complex">
+                            <h3>Log</h3>
+                            <div class="log-filter">
+                                <label for="logFilterSelect" style="font-size:0.8rem; color:var(--text-muted); margin-right:4px;">Hauptlog</label>
+                                <select id="logFilterSelect">
+                                    <option value="hide-watchdog">Watchdog im Hauptlog ausblenden</option>
+                                    <option value="all">Alle Ereignisse im Hauptlog</option>
+                                </select>
+                            </div>
                         </div>
-                    </div>
-                    <div class="timeline-container">
-                        <ul id="timelineList" class="timeline"></ul>
-                    </div>
-                </section>
+                        <div class="timeline-container">
+                            <ul id="timelineList" class="timeline"></ul>
+                        </div>
+                    </section>
+
+                    <section class="card watchdog-card" style="flex: 1; min-height: 0;">
+                        <div class="card-header-complex">
+                            <h3>Watchdog</h3>
+                            <span class="card-subtitle">Spezifische Watchdog-Meldungen</span>
+                        </div>
+                        <div class="timeline-container">
+                            <ul id="watchdogList" class="timeline"></ul>
+                        </div>
+                    </section>
+                </div>
 
                 <section class="card" style="flex: 1; min-height: 0;">
                      <div class="card-header-complex">
