@@ -133,8 +133,11 @@ function renderRuntime(runtime) {
   updateReloadTimestamp(runtime.last_reload);
 
   const journal = runtime.journal || [];
-  renderTimeline(journal);
-  renderWatchdogTimeline(journal);
+  const mainJournal = runtime.main_journal || journal.filter(entry => !isWatchdogEntry(entry));
+  const watchdogJournal = runtime.watchdog_journal || journal.filter(isWatchdogEntry);
+
+  renderTimeline(mainJournal);
+  renderWatchdogTimeline(watchdogJournal);
 
   if (runtime.sys_load && ui.loadDisplay) {
       ui.loadDisplay.innerHTML = `<i class="fa-solid fa-microchip"></i> ${runtime.sys_load}`;
@@ -150,23 +153,25 @@ function renderRuntime(runtime) {
 function renderTimeline(journal) {
     if (!journal || !ui.timelineList) return;
     ui.timelineList.innerHTML = "";
-    journal.forEach(entry => {
-        const li = document.createElement("li");
-        li.className = "timeline-entry";
-        let icon = entry.icon ? entry.icon.replace("fa-", "") : "info";
+    journal
+        .filter(entry => !isWatchdogEntry(entry))
+        .forEach(entry => {
+            const li = document.createElement("li");
+            li.className = "timeline-entry";
+            let icon = entry.icon ? entry.icon.replace("fa-", "") : "info";
 
-        const dateDisplay = formatTimelineDate(entry.time);
+            const dateDisplay = formatTimelineDate(entry.time);
 
-        li.innerHTML = `
-            <div class="t-icon ${entry.type}">
-                <i class="fa-solid fa-${icon}"></i>
-            </div>
-            <div class="t-content">
-                <div class="t-msg">${entry.msg}</div>
-                <div class="t-time">${dateDisplay}</div>
-            </div>`;
-        ui.timelineList.appendChild(li);
-    });
+            li.innerHTML = `
+                <div class="t-icon ${entry.type}">
+                    <i class="fa-solid fa-${icon}"></i>
+                </div>
+                <div class="t-content">
+                    <div class="t-msg">${entry.msg}</div>
+                    <div class="t-time">${dateDisplay}</div>
+                </div>`;
+            ui.timelineList.appendChild(li);
+        });
 }
 
 function renderWatchdogTimeline(journal) {
