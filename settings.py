@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, TypedDict, TYPE_CHECKING
 
 from yarl import URL
@@ -23,6 +24,9 @@ class SettingsFile(TypedDict):
     enable_badges_emotes: bool
     available_drops_check: bool
     priority_mode: PriorityMode
+    logging_watchdog_level: int | None
+    logging_watch_level: int | None
+    api_token: str | None
 
 
 default_settings: SettingsFile = {
@@ -37,6 +41,9 @@ default_settings: SettingsFile = {
     "enable_badges_emotes": False,
     "available_drops_check": False,
     "priority_mode": PriorityMode.PRIORITY_ONLY,
+    "logging_watchdog_level": None,
+    "logging_watch_level": None,
+    "api_token": None,
 }
 
 
@@ -45,10 +52,16 @@ class Settings:
     log: bool
     tray: bool
     dump: bool
+    headless: bool
+    bind: str | None
+    config: Any
+    data_dir: Any
     # args properties
     debug_ws: int
     debug_gql: int
     logging_level: int
+    logging_watchdog_level: int | None
+    logging_watch_level: int | None
     # from settings file
     proxy: URL
     language: str
@@ -61,11 +74,13 @@ class Settings:
     enable_badges_emotes: bool
     available_drops_check: bool
     priority_mode: PriorityMode
+    api_token: str | None
 
-    PASSTHROUGH = ("_settings", "_args", "_altered")
+    PASSTHROUGH = ("_settings", "_args", "_altered", "_settings_path")
 
-    def __init__(self, args: ParsedArgs):
-        self._settings: SettingsFile = json_load(SETTINGS_PATH, default_settings)
+    def __init__(self, args: ParsedArgs, *, settings_path: Path | None = None):
+        self._settings_path = settings_path or SETTINGS_PATH
+        self._settings: SettingsFile = json_load(self._settings_path, default_settings)
         self._args: ParsedArgs = args
         self._altered: bool = False
 
@@ -98,4 +113,4 @@ class Settings:
 
     def save(self, *, force: bool = False) -> None:
         if self._altered or force:
-            json_save(SETTINGS_PATH, self._settings, sort=True)
+            json_save(self._settings_path, self._settings, sort=True)

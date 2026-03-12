@@ -105,6 +105,7 @@ DUMP_PATH = Path(WORKING_DIR, "dump.dat")
 LOCK_PATH = Path(WORKING_DIR, "lock.file")
 CACHE_PATH = Path(WORKING_DIR, "cache")
 CACHE_DB = Path(CACHE_PATH, "mapping.json")
+RESPONSES_CACHE = Path(CACHE_PATH, "responses.json")
 COOKIES_PATH = Path(WORKING_DIR, "cookies.jar")
 SETTINGS_PATH = Path(WORKING_DIR, "settings.json")
 # Typing
@@ -143,6 +144,30 @@ FILE_FORMATTER = logging.Formatter(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 OUTPUT_FORMATTER = logging.Formatter("{levelname}: {message}", style='{', datefmt="%H:%M:%S")
+
+
+def set_paths(*, working_dir: Path | None = None, settings_path: Path | None = None) -> None:
+    """
+    Update path-related constants for alternate data/config locations.
+
+    This is primarily used by headless or CLI entry points to redirect all
+    generated files (logs, cookies, cache, settings, etc.) into a custom
+    directory or settings file path.
+    """
+    global WORKING_DIR, LANG_PATH, LOG_PATH, DUMP_PATH, LOCK_PATH
+    global CACHE_PATH, CACHE_DB, COOKIES_PATH, SETTINGS_PATH
+
+    if working_dir is not None:
+        WORKING_DIR = Path(working_dir).resolve()
+        WORKING_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_PATH = Path(WORKING_DIR, "log.txt")
+    DUMP_PATH = Path(WORKING_DIR, "dump.dat")
+    LOCK_PATH = Path(WORKING_DIR, "lock.file")
+    CACHE_PATH = Path(WORKING_DIR, "cache")
+    CACHE_DB = Path(CACHE_PATH, "mapping.json")
+    COOKIES_PATH = Path(WORKING_DIR, "cookies.jar")
+    SETTINGS_PATH = Path(settings_path).resolve() if settings_path else Path(WORKING_DIR, "settings.json")
+    LANG_PATH = _resource_path("lang")
 
 
 class ClientInfo:

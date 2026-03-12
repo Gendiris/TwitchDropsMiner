@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import asyncio
 import logging
+import random
+import base64
 from time import time
 from copy import deepcopy
 from itertools import chain
@@ -16,7 +18,6 @@ import aiohttp
 from yarl import URL
 
 from translate import _
-from gui import GUIManager
 from channel import Channel
 from websocket import WebsocketPool
 from inventory import DropsCampaign
@@ -28,6 +29,7 @@ from exceptions import (
     MinerException,
     RequestInvalid,
     CaptchaRequired,
+    AuthMissingCookies,
     RequestException,
 )
 from utils import (
@@ -45,6 +47,7 @@ from constants import (
     MAX_INT,
     DUMP_PATH,
     COOKIES_PATH,
+    RESPONSES_CACHE,
     MAX_CHANNELS,
     GQL_OPERATIONS,
     WATCH_INTERVAL,
@@ -53,14 +56,18 @@ from constants import (
     PriorityMode,
     WebsocketTopic,
 )
+from response_cache import ResponseCache
 
 if TYPE_CHECKING:
     from utils import Game
-    from gui import LoginForm
+    from gui import GUIManager, LoginForm
+    from headless import HeadlessGUI
     from channel import Stream
     from settings import Settings
     from inventory import TimedDrop
     from constants import ClientInfo, JsonType, GQLOperation
+    from miner_service import MinerService
+    from state_store import StateStore
 
 
 logger = logging.getLogger("TwitchDrops")
@@ -87,6 +94,7 @@ class _AuthState:
         self.session_id: str
         self.access_token: str
         self.client_version: str
+        self._session_expires_at: datetime | None = None
 
     def _hasattrs(self, *attrs: str) -> bool:
         return all(hasattr(self, attr) for attr in attrs)
@@ -103,6 +111,7 @@ class _AuthState:
             "session_id",
             "access_token",
             "client_version",
+            "_session_expires_at",
         )
         self._logged_in.clear()
 
@@ -350,87 +359,133 @@ class _AuthState:
     async def _validate(self):
         if not hasattr(self, "session_id"):
             self.session_id = create_nonce(CHARS_HEX_LOWER, 16)
-        if not self._hasattrs("device_id", "access_token", "user_id"):
-            session = await self._twitch.get_session()
-            jar = cast(aiohttp.CookieJar, session.cookie_jar)
-            client_info: ClientInfo = self._twitch._client_type
+
+        session = await self._twitch.get_session()
+        jar = cast(aiohttp.CookieJar, session.cookie_jar)
+        client_info: ClientInfo = self._twitch._client_type
+        cookie = jar.filter_cookies(client_info.CLIENT_URL)
+
+        if (auth_cookie := cookie.get("auth-token")) is None:
+            raise AuthMissingCookies()
+
+        if not hasattr(self, "access_token"):
+            logger.info("Restoring session from cookie")
+            self.access_token = auth_cookie.value
+
+        now = datetime.now(timezone.utc)
+        if (
+            self._logged_in.is_set()
+            and self._hasattrs("access_token", "user_id", "device_id")
+            and self._session_expires_at is not None
+            and self._session_expires_at > now
+        ):
+            logger.debug(
+                "Skipping auth validation; session valid for another %.1fs",
+                (self._session_expires_at - now).total_seconds(),
+            )
+            return
+
         if not self._hasattrs("device_id"):
             async with self._twitch.request(
                 "GET", client_info.CLIENT_URL, headers=self.headers()
             ) as response:
                 page_html = await response.text("utf8")
                 assert page_html is not None
-            #     match = re.search(r'twilightBuildID="([-a-z0-9]+)"', page_html)
-            # if match is None:
-            #     raise MinerException("Unable to extract client_version")
-            # self.client_version = match.group(1)
-            # doing the request ends up setting the "unique_id" value in the cookie
             cookie = jar.filter_cookies(client_info.CLIENT_URL)
+            if "unique_id" not in cookie:
+                raise AuthMissingCookies()
             self.device_id = cookie["unique_id"].value
-        if not self._hasattrs("access_token", "user_id"):
-            # looks like we're missing something
-            login_form: LoginForm = self._twitch.gui.login
-            logger.info("Checking login")
-            login_form.update(_("gui", "login", "logging_in"), None)
-            for client_mismatch_attempt in range(2):
-                for invalid_token_attempt in range(2):
-                    cookie = jar.filter_cookies(client_info.CLIENT_URL)
-                    if "auth-token" not in cookie:
-                        self.access_token = await self._oauth_login()
-                        cookie["auth-token"] = self.access_token
-                    elif not hasattr(self, "access_token"):
-                        logger.info("Restoring session from cookie")
-                        self.access_token = cookie["auth-token"].value
-                    # validate the auth token, by obtaining user_id
-                    async with self._twitch.request(
-                        "GET",
-                        "https://id.twitch.tv/oauth2/validate",
-                        headers={"Authorization": f"OAuth {self.access_token}"}
-                    ) as response:
-                        if response.status == 401:
-                            # the access token we have is invalid - clear the cookie and reauth
-                            logger.info("Restored session is invalid")
-                            assert client_info.CLIENT_URL.host is not None
-                            jar.clear_domain(client_info.CLIENT_URL.host)
-                            continue
-                        elif response.status == 200:
-                            validate_response = await response.json()
-                            break
-                else:
-                    raise RuntimeError("Login verification failure (step #2)")
-                # ensure the cookie's client ID matches the currently selected client
-                if validate_response["client_id"] == client_info.CLIENT_ID:
-                    break
-                # otherwise, we need to delete the entire cookie file and clear the jar
-                logger.info("Cookie client ID mismatch")
-                jar.clear()
-                COOKIES_PATH.unlink(missing_ok=True)
+
+        login_form: LoginForm = self._twitch.gui.login
+        logger.info("Validating authentication cookies")
+        login_form.update(_("gui", "login", "logging_in"), None)
+
+        async with self._twitch.request(
+            "GET",
+            "https://id.twitch.tv/oauth2/validate",
+            headers={"Authorization": f"OAuth {self.access_token}"},
+        ) as response:
+            if response.status != 200:
+                logger.info("Cookie auth-token failed validation: %s", response.status)
+                raise AuthMissingCookies()
+            validate_response = await response.json()
+
+        expires_in = validate_response.get("expires_in")
+        expires_ref = datetime.now(timezone.utc)
+        if isinstance(expires_in, int) and expires_in > 0:
+            self._session_expires_at = expires_ref + timedelta(seconds=expires_in)
+        else:
+            token_expiration = self._extract_access_token_exp()
+            if token_expiration is not None and token_expiration > expires_ref:
+                self._session_expires_at = token_expiration
             else:
-                raise RuntimeError("Login verification failure (step #1)")
-            self.user_id = int(validate_response["user_id"])
-            cookie["persistent"] = str(self.user_id)
-            logger.info(f"Login successful, user ID: {self.user_id}")
-            login_form.update(_("gui", "login", "logged_in"), self.user_id)
-            # update our cookie and save it
-            jar.update_cookies(cookie, client_info.CLIENT_URL)
-            jar.save(COOKIES_PATH)
+                self._session_expires_at = expires_ref + timedelta(minutes=15)
+
+        if validate_response["client_id"] != client_info.CLIENT_ID:
+            logger.info("Cookie client ID mismatch")
+            raise AuthMissingCookies()
+
+        self.user_id = int(validate_response["user_id"])
+        cookie["persistent"] = str(self.user_id)
+        logger.info(f"Login successful, user ID: {self.user_id}")
+        login_form.update(_("gui", "login", "logged_in"), self.user_id)
+        jar.update_cookies(cookie, client_info.CLIENT_URL)
+        jar.save(COOKIES_PATH)
         self._logged_in.set()
 
     def invalidate(self):
-        self._delattrs("access_token")
+        self._delattrs("access_token", "user_id", "_session_expires_at")
+        self._logged_in.clear()
+
+    def _extract_access_token_exp(self) -> datetime | None:
+        # Access tokens from Twitch often aren't JWTs, but derive the expiry if possible.
+        parts = self.access_token.split(".")
+        if len(parts) < 2:
+            return None
+        payload = parts[1]
+        try:
+            payload += "=" * (-len(payload) % 4)
+            decoded = base64.urlsafe_b64decode(payload)
+            payload_json = json.loads(decoded)
+            exp = payload_json.get("exp")
+            if isinstance(exp, (int, float)):
+                return datetime.fromtimestamp(exp, tz=timezone.utc)
+        except (ValueError, json.JSONDecodeError):
+            logger.debug("Failed to decode access token expiry", exc_info=True)
+            return None
+        return None
 
 
 class Twitch:
-    def __init__(self, settings: Settings):
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        service: "MinerService | None" = None,
+        state_store: "StateStore | None" = None,
+    ):
         self.settings: Settings = settings
+        self._service: MinerService | None = service
+        self.state_store: StateStore | None = state_store or getattr(service, "_state_store", None)
         # State management
         self._state: State = State.IDLE
         self._state_change = asyncio.Event()
+        if self.state_store is not None:
+            self.state_store.set_state(self._state)
         self.wanted_games: list[Game] = []
         self.inventory: list[DropsCampaign] = []
         self._drops: dict[str, TimedDrop] = {}
         self._campaigns: dict[str, DropsCampaign] = {}
         self._mnt_triggers: deque[datetime] = deque()
+        self._inventory_cache = ResponseCache(RESPONSES_CACHE)
+        self._inventory_refresh_pending: bool = False
+        self._inventory_force: bool = False
+        self._inventory_deadline: datetime = datetime.now(timezone.utc)
+        self._cached_inventory: tuple[
+            dict[str, JsonType], dict[str, datetime], datetime, list[JsonType]
+        ] | None = None
+        self._channel_refresh_requested: bool = False
+        self._inventory_ttl_max = timedelta(minutes=20)
         # NOTE: GQL is pretty volatile and breaks everything if one runs into their rate limit.
         # Do not modify the default, safe values.
         self._qgl_limiter = RateLimiter(capacity=5, window=1)
@@ -439,7 +494,14 @@ class Twitch:
         self._session: aiohttp.ClientSession | None = None
         self._auth_state: _AuthState = _AuthState(self)
         # GUI
-        self.gui = GUIManager(self)
+        if settings.headless:
+            from headless import HeadlessGUI
+
+            self.gui: GUIManager | HeadlessGUI = HeadlessGUI(self, service=service)
+        else:
+            from gui import GUIManager
+
+            self.gui = GUIManager(self, service=service)
         # Storing and watching channels
         self.channels: OrderedDict[int, Channel] = OrderedDict()
         self.watching_channel: AwaitableValue[Channel] = AwaitableValue()
@@ -524,12 +586,41 @@ class Twitch:
         if self._state is not State.EXIT:
             # prevent state changing once we switch to exit state
             self._state = state
+        if self.state_store is not None:
+            self.state_store.set_state(self._state)
         self._state_change.set()
 
     def state_change(self, state: State) -> abc.Callable[[], None]:
         # this is identical to change_state, but defers the call
         # perfect for GUI usage
         return partial(self.change_state, state)
+
+    def request_inventory_refresh(self, *, force: bool = False) -> None:
+        """
+        Queue a campaigns/inventory refresh respecting TTL unless forced.
+        """
+        if force:
+            self._inventory_force = True
+            self._inventory_deadline = datetime.now(timezone.utc)
+        self._inventory_refresh_pending = True
+        self.change_state(State.INVENTORY_FETCH)
+
+    def request_channel_refresh(self) -> None:
+        """
+        Queue a channel list refresh. This is debounced through the state loop.
+        """
+        if self._channel_refresh_requested:
+            return
+        self._channel_refresh_requested = True
+        self.change_state(State.CHANNELS_CLEANUP)
+
+    def _new_inventory_deadline(self, *, from_time: datetime | None = None) -> datetime:
+        """
+        Compute a new refresh deadline using a jittered TTL (10–20 minutes).
+        """
+        jitter_seconds = random.uniform(10 * 60, 20 * 60)
+        base = from_time or datetime.now(timezone.utc)
+        return base + timedelta(seconds=jitter_seconds)
 
     def close(self):
         """
@@ -715,6 +806,7 @@ class Twitch:
                         del channels[channel.id]
                         channel.remove()
                     del to_remove_channels, to_remove_topics
+                self._channel_refresh_requested = False
                 if self.wanted_games:
                     self.change_state(State.CHANNELS_FETCH)
                 else:
@@ -782,6 +874,8 @@ class Twitch:
                 for channel in ordered_channels:
                     channels[channel.id] = channel
                     channel.display(add=True)
+                if self.state_store is not None:
+                    self.state_store.set_channels(channels.values())
                 # subscribe to these channel's state updates
                 to_add_topics: list[WebsocketTopic] = []
                 for channel_id in channels:
@@ -835,7 +929,11 @@ class Twitch:
                 # Change into the selected channel, stay in the watching channel,
                 # or select a new channel that meets the required conditions
                 new_watching = None
-                selected_channel = self.gui.channels.get_selection()
+                selected_channel = None
+                if self._service is not None:
+                    selected_channel = self._service.consume_switch_request()
+                if selected_channel is None:
+                    selected_channel = self.gui.channels.get_selection()
                 if selected_channel is not None and self.can_watch(selected_channel):
                     # selected channel is checked first, and set as long as we can watch it
                     new_watching = selected_channel
@@ -919,6 +1017,10 @@ class Twitch:
                     gql_drop: TimedDrop | None = self._drops.get(drop_data["dropID"])
                     if gql_drop is not None and gql_drop.can_earn(channel):
                         gql_drop.update_minutes(drop_data["currentMinutesWatched"])
+                        if self.state_store is not None:
+                            self.state_store.update_drop_progress(
+                                gql_drop.id, gql_drop.current_minutes, gql_drop.required_minutes
+                            )
                         drop_text: str = (
                             f"{gql_drop.name} ({gql_drop.campaign.game}, "
                             f"{gql_drop.current_minutes}/{gql_drop.required_minutes})"
@@ -947,35 +1049,30 @@ class Twitch:
 
     @task_wrapper(critical=True)
     async def _maintenance_task(self) -> None:
-        now = datetime.now(timezone.utc)
-        next_period = now + timedelta(hours=1)
         while True:
-            # exit if there's no need to repeat the loop
             now = datetime.now(timezone.utc)
-            if now >= next_period:
-                break
-            next_trigger = next_period
-            while self._mnt_triggers and self._mnt_triggers[0] <= next_trigger:
-                next_trigger = self._mnt_triggers.popleft()
-            trigger_type: str = "Reload" if next_trigger == next_period else "Cleanup"
+            # choose the earliest trigger between campaign timing and inventory TTL
+            next_trigger = self._inventory_deadline
+            if self._mnt_triggers:
+                next_trigger = min(next_trigger, self._mnt_triggers[0])
+            if next_trigger <= now:
+                if self._mnt_triggers and self._mnt_triggers[0] <= now:
+                    logger.log(CALL, "Maintenance task requests channels cleanup")
+                    self._mnt_triggers.popleft()
+                    self.change_state(State.CHANNELS_CLEANUP)
+                    continue
+                logger.log(CALL, "Maintenance task requests inventory refresh")
+                self.request_inventory_refresh()
+                self._inventory_deadline = self._new_inventory_deadline(from_time=now)
+                continue
             logger.log(
                 CALL,
                 (
                     "Maintenance task waiting until: "
-                    f"{next_trigger.astimezone().strftime('%X')} ({trigger_type})"
+                    f"{next_trigger.astimezone().strftime('%X')}"
                 )
             )
             await asyncio.sleep((next_trigger - now).total_seconds())
-            # exit after waiting, before the actions
-            now = datetime.now(timezone.utc)
-            if now >= next_period:
-                break
-            if next_trigger != next_period:
-                logger.log(CALL, "Maintenance task requests channels cleanup")
-                self.change_state(State.CHANNELS_CLEANUP)
-        # this triggers a restart of this task every (up to) 60 minutes
-        logger.log(CALL, "Maintenance task requests a reload")
-        self.change_state(State.INVENTORY_FETCH)
 
     def can_watch(self, channel: Channel) -> bool:
         """
@@ -1020,6 +1117,8 @@ class Twitch:
         self.gui.tray.change_icon("active")
         self.gui.channels.set_watching(channel)
         self.watching_channel.set(channel)
+        if self.state_store is not None:
+            self.state_store.set_watching(channel)
         if update_status:
             status_text = _("status", "watching").format(channel=channel.name)
             self.print(status_text)
@@ -1029,6 +1128,8 @@ class Twitch:
         self.gui.clear_drop()
         self.watching_channel.clear()
         self.gui.channels.clear_watching()
+        if self.state_store is not None:
+            self.state_store.set_watching(None)
 
     def restart_watching(self):
         self.gui.progress.stop_timer()
@@ -1118,6 +1219,7 @@ class Twitch:
                     if stream_after is None:
                         # Channel going OFFLINE
                         self.print(_("status", "goes_offline").format(channel=channel.name))
+                        self.request_channel_refresh()
                     else:
                         # Channel stays ONLINE, but we can't watch it anymore
                         logger.info(
@@ -1125,6 +1227,7 @@ class Twitch:
                             f"(🎁: {stream_before.drops_enabled and '✔' or '❌'} -> "
                             f"{stream_after.drops_enabled and '✔' or '❌'})"
                         )
+                        self.request_channel_refresh()
                     self.change_state(State.CHANNEL_SWITCH)
                 else:
                     # Channel stays ONLINE, and we can still watch it - no change
@@ -1143,6 +1246,8 @@ class Twitch:
                     # ... and we can and should watch it
                     self.watch(channel)
         channel.display()
+        if self.state_store is not None:
+            self.state_store.set_channels(self.channels.values())
 
     @task_wrapper
     async def process_drops(self, user_id: int, message: JsonType):
@@ -1186,7 +1291,7 @@ class Twitch:
             if campaign.can_earn(watching_channel):
                 self.restart_watching()
             else:
-                self.change_state(State.INVENTORY_FETCH)
+                self.request_inventory_refresh(force=True)
             return
         assert msg_type == "drop-progress"
         if drop is not None:
@@ -1201,6 +1306,10 @@ class Twitch:
         if drop is not None and drop.can_earn(self.watching_channel.get_with_default(None)):
             # the received payload is for the drop we expected
             drop.update_minutes(message["data"]["current_progress_min"])
+            if self.state_store is not None:
+                self.state_store.update_drop_progress(
+                    drop.id, drop.current_minutes, drop.required_minutes
+                )
 
     @task_wrapper
     async def process_notifications(self, user_id: int, message: JsonType):
@@ -1211,7 +1320,7 @@ class Twitch:
                 "quests_viewer_reward_campaign_earned_emote",  # emote confirmation
                 # badge confirmation?
             ):
-                self.change_state(State.INVENTORY_FETCH)
+                self.request_inventory_refresh(force=True)
                 await self.gql_request(
                     GQL_OPERATIONS["NotificationsDelete"].with_variables(
                         {"input": {"id": data["id"]}}
@@ -1395,73 +1504,72 @@ class Twitch:
         }
         return self._merge_data(campaign_ids, fetched_data)
 
-    async def fetch_inventory(self) -> None:
+    async def fetch_inventory(self, *, force: bool = False) -> None:
         status_update = self.gui.status.update
-        status_update(_("gui", "status", "fetching_inventory"))
-        # fetch in-progress campaigns (inventory)
-        response = await self.gql_request(GQL_OPERATIONS["Inventory"])
-        inventory: JsonType = response["data"]["currentUser"]["inventory"]
-        ongoing_campaigns: list[JsonType] = inventory["dropCampaignsInProgress"] or []
-        # this contains claimed benefit edge IDs, not drop IDs
-        claimed_benefits: dict[str, datetime] = {
-            b["id"]: timestamp(b["lastAwardedAt"]) for b in inventory["gameEventDrops"]
-        }
-        inventory_data: dict[str, JsonType] = {c["id"]: c for c in ongoing_campaigns}
-        # fetch general available campaigns data (campaigns)
-        response = await self.gql_request(GQL_OPERATIONS["Campaigns"])
-        available_list: list[JsonType] = response["data"]["currentUser"]["dropCampaigns"] or []
-        applicable_statuses = ("ACTIVE", "UPCOMING")
-        available_campaigns: dict[str, JsonType] = {
-            c["id"]: c
-            for c in available_list
-            if c["status"] in applicable_statuses  # that are currently not expired
-        }
-        # fetch detailed data for each campaign, in chunks
-        status_update(_("gui", "status", "fetching_campaigns"))
-        fetch_campaigns_tasks: list[asyncio.Task[Any]] = [
-            asyncio.create_task(self.fetch_campaigns(campaigns_chunk))
-            for campaigns_chunk in chunk(available_campaigns.items(), 20)
-        ]
-        try:
-            for coro in asyncio.as_completed(fetch_campaigns_tasks):
-                chunk_campaigns_data = await coro
-                # merge the inventory and campaigns datas together
-                inventory_data = self._merge_data(inventory_data, chunk_campaigns_data)
-        except Exception:
-            # asyncio.as_completed doesn't cancel tasks on errors
-            for task in fetch_campaigns_tasks:
-                task.cancel()
-            raise
-        # filter out invalid campaigns
-        for campaign_id in list(inventory_data.keys()):
-            if inventory_data[campaign_id]["game"] is None:
-                del inventory_data[campaign_id]
+        now = datetime.now(timezone.utc)
+        use_cache_only = not force and not self._inventory_force and now < self._inventory_deadline
+        inventory_payload: tuple[
+            dict[str, JsonType], dict[str, datetime], datetime, list[JsonType]
+        ] | None = None
+
+        if not force and not self._inventory_force:
+            if (
+                self._cached_inventory is not None
+                and now - self._cached_inventory[2] <= self._inventory_ttl_max
+            ):
+                inventory_payload = self._cached_inventory
+            else:
+                cached = self._inventory_cache.get("campaign_inventory", max_age=self._inventory_ttl_max)
+                if cached is not None:
+                    cached_payload, fetched_at = cached
+                    if (
+                        isinstance(cached_payload, dict)
+                        and "inventory_data" in cached_payload
+                        and "claimed_benefits" in cached_payload
+                        and "game_event_drops" in cached_payload
+                    ):
+                        inventory_payload = (
+                            cached_payload["inventory_data"],
+                            cached_payload["claimed_benefits"],
+                            fetched_at,
+                            cached_payload["game_event_drops"],
+                        )
+                        self._cached_inventory = inventory_payload
+
+        if inventory_payload is None or not use_cache_only:
+            inventory_payload = await self._pull_inventory_with_backoff(status_update)
+            cached_payload = {
+                "inventory_data": inventory_payload[0],
+                "claimed_benefits": inventory_payload[1],
+                "game_event_drops": inventory_payload[3],
+            }
+            self._inventory_cache.set("campaign_inventory", cached_payload)
+            self._cached_inventory = inventory_payload
+
+        inventory_data, claimed_benefits, fetched_at, game_event_drops = inventory_payload
+        self._inventory_deadline = self._new_inventory_deadline(from_time=fetched_at)
+        self._inventory_refresh_pending = False
+        self._inventory_force = False
 
         if self.settings.dump:
-            # dump the campaigns data to the dump file
             with open(DUMP_PATH, 'a', encoding="utf8") as file:
-                # we need to pre-process the inventory dump a little
                 dump_data: JsonType = deepcopy(inventory_data)
                 for campaign_data in dump_data.values():
-                    # replace ACL lists with a simple text description
                     if (
                         campaign_data["allow"]
                         and campaign_data["allow"].get("isEnabled", True)
                         and campaign_data["allow"]["channels"]
                     ):
-                        # simply count the channels included in the ACL
                         campaign_data["allow"]["channels"] = (
                             f"{len(campaign_data['allow']['channels'])} channels"
                         )
-                    # replace drop instance IDs, so they don't include user IDs
                     for drop_data in campaign_data["timeBasedDrops"]:
                         if "self" in drop_data and drop_data["self"]["dropInstanceID"]:
                             drop_data["self"]["dropInstanceID"] = "..."
                 json.dump(dump_data, file, indent=4, sort_keys=True)
-                file.write("\n\n")  # add 2x new line spacer
-                json.dump(inventory["gameEventDrops"], file, indent=4, sort_keys=True, default=str)
+                file.write("\n\n")
+                json.dump(game_event_drops, file, indent=4, sort_keys=True, default=str)
 
-        # use the merged data to create campaign objects
         campaigns: list[DropsCampaign] = [
             DropsCampaign(self, campaign_data, claimed_benefits)
             for campaign_data in inventory_data.values()
@@ -1476,15 +1584,15 @@ class Twitch:
         self._mnt_triggers.clear()
         switch_triggers: set[datetime] = set()
         next_hour = datetime.now(timezone.utc) + timedelta(hours=1)
-        # add the campaigns to the internal inventory
         for campaign in campaigns:
             self._drops.update({drop.id: drop for drop in campaign.drops})
             if campaign.can_earn_within(next_hour):
                 switch_triggers.update(campaign.time_triggers)
             self.inventory.append(campaign)
             self._campaigns[campaign.id] = campaign
-        # concurrently add the campaigns into the GUI
-        # NOTE: this fetches pictures from the CDN, so might be slow without a cache
+        if self.state_store is not None:
+            self.state_store.set_campaigns(self.inventory)
+            self.state_store.set_last_reload(fetched_at)
         status_update(
             _("gui", "status", "adding_campaigns").format(counter=f"(0/{len(campaigns)})")
         )
@@ -1500,23 +1608,70 @@ class Twitch:
                         counter=f"({i}/{len(campaigns)})"
                     )
                 )
-                # this is needed here explicitly, because cache reads from disk don't raise this
                 if self.gui.close_requested:
                     raise ExitRequest()
         except Exception:
-            # asyncio.as_completed doesn't cancel tasks on errors
             for task in add_campaign_tasks:
                 task.cancel()
             raise
         self._mnt_triggers.extend(sorted(switch_triggers))
-        # trim out all triggers that we're already past
         now = datetime.now(timezone.utc)
         while self._mnt_triggers and self._mnt_triggers[0] <= now:
             self._mnt_triggers.popleft()
-        # NOTE: maintenance task is restarted at the end of each inventory fetch
         if self._mnt_task is not None and not self._mnt_task.done():
             self._mnt_task.cancel()
         self._mnt_task = asyncio.create_task(self._maintenance_task())
+
+    async def _pull_inventory_with_backoff(
+        self, status_update: abc.Callable[[str], Any]
+    ) -> tuple[dict[str, JsonType], dict[str, datetime], datetime, list[JsonType]]:
+        backoff = ExponentialBackoff(maximum=5*60)
+        last_exc: Exception | None = None
+        for delay in backoff:
+            try:
+                status_update(_("gui", "status", "fetching_inventory"))
+                response = await self.gql_request(GQL_OPERATIONS["Inventory"])
+                inventory: JsonType = response["data"]["currentUser"]["inventory"]
+                ongoing_campaigns: list[JsonType] = inventory["dropCampaignsInProgress"] or []
+                game_event_drops: list[JsonType] = inventory["gameEventDrops"] or []
+                claimed_benefits: dict[str, datetime] = {
+                    b["id"]: timestamp(b["lastAwardedAt"]) for b in game_event_drops
+                }
+                inventory_data: dict[str, JsonType] = {c["id"]: c for c in ongoing_campaigns}
+                response = await self.gql_request(GQL_OPERATIONS["Campaigns"])
+                available_list: list[JsonType] = response["data"]["currentUser"]["dropCampaigns"] or []
+                applicable_statuses = ("ACTIVE", "UPCOMING")
+                available_campaigns: dict[str, JsonType] = {
+                    c["id"]: c
+                    for c in available_list
+                    if c["status"] in applicable_statuses
+                }
+                status_update(_("gui", "status", "fetching_campaigns"))
+                fetch_campaigns_tasks: list[asyncio.Task[Any]] = [
+                    asyncio.create_task(self.fetch_campaigns(campaigns_chunk))
+                    for campaigns_chunk in chunk(available_campaigns.items(), 20)
+                ]
+                try:
+                    for coro in asyncio.as_completed(fetch_campaigns_tasks):
+                        chunk_campaigns_data = await coro
+                        inventory_data = self._merge_data(inventory_data, chunk_campaigns_data)
+                except Exception:
+                    for task in fetch_campaigns_tasks:
+                        task.cancel()
+                    raise
+                for campaign_id in list(inventory_data.keys()):
+                    if inventory_data[campaign_id]["game"] is None:
+                        del inventory_data[campaign_id]
+                return inventory_data, claimed_benefits, datetime.now(timezone.utc), game_event_drops
+            except ExitRequest:
+                raise
+            except Exception as exc:  # noqa: PERF203
+                last_exc = exc
+                logger.warning(
+                    f"Inventory refresh failed, retrying in {round(delay)}s: {exc}"
+                )
+                await asyncio.sleep(delay)
+        raise last_exc or RuntimeError("Inventory refresh failed without exception")
 
     def get_active_campaign(self, channel: Channel | None = None) -> DropsCampaign | None:
         if not self.wanted_games:

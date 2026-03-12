@@ -13,7 +13,7 @@ from translate import _
 from channel import Channel
 from utils import timestamp, Game
 from exceptions import GQLException
-from constants import GQL_OPERATIONS, MAX_EXTRA_MINUTES, URLType, State
+from constants import CALL, GQL_OPERATIONS, MAX_EXTRA_MINUTES, URLType, State
 
 if TYPE_CHECKING:
     from collections import abc
@@ -278,6 +278,14 @@ class TimedDrop(BaseDrop):
             return 1.0
         return self.current_minutes / self.required_minutes
 
+    @staticmethod
+    def _progress_bar(current: int, required: int, width: int = 20) -> tuple[str, float]:
+        required = max(required, 1)
+        ratio = max(0.0, min(current / required, 1.0))
+        filled = int(ratio * width)
+        bar = f"[{'#' * filled}{'.' * (width - filled)}]"
+        return bar, ratio
+
     @property
     def availability(self) -> float:
         now = datetime.now(timezone.utc)
@@ -334,6 +342,23 @@ class TimedDrop(BaseDrop):
             delta = -self.real_current_minutes
         elif self.real_current_minutes + delta > self.required_minutes:
             delta = self.required_minutes - self.real_current_minutes
+
+        updated_minutes = self.real_current_minutes + delta
+        bar, ratio = self._progress_bar(updated_minutes, self.required_minutes)
+        watching_channel = self.campaign._twitch.watching_channel.get_with_default(None)
+        logger.log(
+            CALL,
+            "Progress update for drop %s (%s) %s %s/%s min (%.1f%%) | campaign=%s | game=%s | channel=%s",
+            self.name,
+            self.id,
+            bar,
+            updated_minutes,
+            self.required_minutes,
+            ratio * 100,
+            self.campaign.name,
+            self.campaign.game.name,
+            watching_channel.name if watching_channel else "N/A",
+        )
         self.campaign._update_real_minutes(delta)
 
 
