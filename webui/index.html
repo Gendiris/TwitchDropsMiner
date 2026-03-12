@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Drops Miner</title>
+  <link rel="stylesheet" href="/webui/styles.css?v=1741300000">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Header ─────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-brand">
+      <i class="fa-solid fa-cube"></i> Drops Miner
+    </div>
+
+    <nav class="header-nav" id="headerNav">
+      <button class="nav-tab active" data-tab="overview">
+        <i class="fa-solid fa-chart-line"></i> <span>Overview</span>
+      </button>
+      <button class="nav-tab" data-tab="campaigns">
+        <i class="fa-solid fa-gift"></i> <span>Kampagnen</span>
+      </button>
+      <button class="nav-tab" data-tab="settings">
+        <i class="fa-solid fa-gear"></i> <span>Einstellungen</span>
+      </button>
+    </nav>
+
+    <div class="header-actions">
+      <span id="connectionStatus" class="conn-status offline">&#9679; Offline</span>
+      <span id="uptimeDisplay" class="uptime">00:00</span>
+    </div>
+  </header>
+
+  <!-- ── Overview ───────────────────────────────────────── -->
+  <div id="tab-overview" class="tab-pane active">
+    <div class="overview-grid">
+
+      <section class="card mining-card">
+        <div class="mining-header">
+          <div class="state-row">
+            <span class="state-dot" id="statusDot"></span>
+            <span class="state-name" id="stateText">–</span>
+            <div class="mining-actions" id="miningActions">
+              <button id="stopButton" class="btn-stop" style="display:none">
+                <i class="fa-solid fa-stop"></i> Stop
+              </button>
+              <button id="startButton" class="btn-start" style="display:none">
+                <i class="fa-solid fa-play"></i> Start
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="watching-row" id="watchingRow">
+          <i class="fa-solid fa-tv"></i>
+          <span id="watchingText">Warten…</span>
+          <span id="watchingGame" class="muted"></span>
+        </div>
+
+        <div id="activeDropSection" style="display:none">
+          <div class="section-label">Aktiver Drop</div>
+          <div class="drop-name" id="activeDropName"></div>
+          <div class="progress-track">
+            <div class="progress-fill" id="activeDropBar" style="width:0%"></div>
+          </div>
+          <div class="drop-meta">
+            <span id="activeDropTime"></span>
+            <span id="activeDropPct" class="muted"></span>
+          </div>
+          <div class="drop-campaign" id="activeDropCampaign"></div>
+        </div>
+
+        <div id="nextDropSection" style="display:none">
+          <div class="section-label muted">Nächster Drop</div>
+          <div class="drop-name muted" id="nextDropName"></div>
+          <div class="progress-track dim">
+            <div class="progress-fill" id="nextDropBar" style="width:0%"></div>
+          </div>
+          <div class="drop-meta muted" id="nextDropTime"></div>
+        </div>
+
+        <div id="idleMessage" class="idle-msg" style="display:none">
+          <i class="fa-solid fa-hourglass-half"></i>
+          <span id="idleText">Suche nach Kanälen…</span>
+        </div>
+
+        <div class="mining-footer">
+          <span class="meta-chip" id="loadDisplay"></span>
+          <span class="meta-chip" id="lastReloadDisplay">Reload: --</span>
+          <span class="meta-chip pending" id="pendingSwitchText" style="display:none"></span>
+        </div>
+      </section>
+
+      <section class="card claims-card">
+        <h3 class="card-title">
+          <i class="fa-solid fa-gift"></i> Zuletzt geclaimt
+        </h3>
+        <ul id="claimsList" class="timeline"></ul>
+      </section>
+
+      <section class="card log-card">
+        <h3 class="card-title">
+          <i class="fa-solid fa-list"></i> Aktivität
+        </h3>
+        <ul id="timelineList" class="timeline"></ul>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- ── Kampagnen ──────────────────────────────────────── -->
+  <div id="tab-campaigns" class="tab-pane">
+    <div class="campaigns-toolbar">
+      <div class="filter-chips">
+        <button class="chip active" data-filter="all">Alle</button>
+        <button class="chip" data-filter="active">Aktiv</button>
+        <button class="chip" data-filter="progressing">Laufend</button>
+        <button class="chip" data-filter="claimed">Abgeschlossen</button>
+      </div>
+      <div class="toolbar-right">
+        <input id="searchInput" class="search-input" placeholder="Suche…" type="search">
+        <label class="prio-toggle" title="Nur Prioritätsspiele">
+          <input type="checkbox" id="filterPriorityBtn">
+          <i class="fa-solid fa-star"></i>
+        </label>
+        <select id="sortSelect" class="sort-select">
+          <option value="priority">Priorität</option>
+          <option value="name">Name</option>
+          <option value="progress">Fortschritt</option>
+          <option value="last_seen" selected>Zuletzt</option>
+        </select>
+      </div>
+    </div>
+    <div id="campaignsList" class="campaigns-list">
+      <div class="empty-state">Keine Campaigns geladen</div>
+    </div>
+  </div>
+
+  <!-- ── Einstellungen ──────────────────────────────────── -->
+  <div id="tab-settings" class="tab-pane">
+    <div class="settings-layout">
+
+      <section class="card">
+        <div class="card-title-row">
+          <h3 class="card-title" style="margin:0">Einstellungen</h3>
+          <span id="settingsStatus"></span>
+        </div>
+        <form id="settingsForm">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Sprache</label>
+              <select name="language">
+                <option value="English">English</option>
+                <option value="Deutsch">Deutsch</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Prioritätsmodus</label>
+              <select name="priority_mode">
+                <option value="PRIORITY_ONLY">Priorität zuerst</option>
+                <option value="ENDING_SOONEST">Endet bald</option>
+                <option value="LOW_AVBL_FIRST">Seltenheit</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Qualität (Header)</label>
+              <select name="connection_quality">
+                <option value="1">160p</option>
+                <option value="6">1080p</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Priorität (CSV)</label>
+              <input type="text" name="priority">
+            </div>
+            <div class="form-group">
+              <label>Ausschluss (CSV)</label>
+              <input type="text" name="exclude">
+            </div>
+            <div class="form-group">
+              <label>Proxy</label>
+              <input type="text" name="proxy">
+            </div>
+          </div>
+
+          <div class="toggles-grid">
+            <label class="toggle-card">
+              <input type="checkbox" name="tray_notifications">
+              <span>Tray Info</span>
+            </label>
+            <label class="toggle-card">
+              <input type="checkbox" name="autostart_tray">
+              <span>Autostart</span>
+            </label>
+            <label class="toggle-card">
+              <input type="checkbox" name="enable_badges_emotes">
+              <span>Farm Badges</span>
+            </label>
+            <label class="toggle-card">
+              <input type="checkbox" name="available_drops_check">
+              <span>Check Drops</span>
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn-primary">Speichern</button>
+            <button type="button" id="clearJournalBtn" class="btn-danger-sm">
+              <i class="fa-solid fa-trash"></i> Journal leeren
+            </button>
+            <button type="button" id="restartServiceBtn" class="btn-danger-sm">
+              <i class="fa-solid fa-rotate"></i> Service neu starten
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <details class="card watchdog-details">
+        <summary>
+          <i class="fa-solid fa-dog"></i> Watchdog
+          <span class="muted" style="margin-left:0.25rem">(Entwickler)</span>
+        </summary>
+        <ul id="watchdogList" class="timeline"></ul>
+      </details>
+
+      <details class="card channels-details">
+        <summary>
+          <i class="fa-solid fa-tower-broadcast"></i>
+          Kanäle <span id="channelCount" class="badge">0</span>
+        </summary>
+        <ul id="channelsList" class="channels-list"></ul>
+      </details>
+
+    </div>
+  </div>
+
+</div><!-- .app -->
+
+<!-- ── Mobile Bottom Tab Bar ────────────────────────────── -->
+<nav class="mobile-tabbar">
+  <button class="mobile-tab active" data-tab="overview">
+    <i class="fa-solid fa-chart-line"></i><span>Overview</span>
+  </button>
+  <button class="mobile-tab" data-tab="campaigns">
+    <i class="fa-solid fa-gift"></i><span>Drops</span>
+  </button>
+  <button class="mobile-tab" data-tab="settings">
+    <i class="fa-solid fa-gear"></i><span>Einstellungen</span>
+  </button>
+</nav>
+
+<script src="/webui/main.js?v=1741300000"></script>
+</body>
+</html>
