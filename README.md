@@ -1,3 +1,31 @@
+# Twitch Drops Miner (Headless Fork)
+
+> **This is a fork of [DevilXD/TwitchDropsMiner](https://github.com/DevilXD/TwitchDropsMiner)** with added support for headless/server operation. It is designed to run 24/7 on a Raspberry Pi or similar device, without a GUI.
+
+### What this fork adds:
+
+- **Headless mode** (`--headless`) — runs without Tkinter/GUI, suitable for servers and embedded devices.
+- **Web API** (`--bind host:port`) — JSON REST API for monitoring and controlling the miner remotely.
+- **Web UI** — browser-based dashboard (served at `/`) showing live mining status, campaigns, channels, activity journal, and settings management.
+- **Service layer** (`miner_service.py`) — centralized lifecycle controller with auto-restart on crashes (with backoff and cap).
+- **State store** (`state_store.py`) — thread-safe state aggregation for the API/WebUI, with persistent journal and claims history.
+- **Watchdog** — periodic health check that detects stalled mining loops and triggers automatic reloads.
+- **Response cache** (`response_cache.py`) — disk-backed TTL cache to reduce redundant API calls across restarts.
+
+### Headless Quick Start:
+
+```bash
+python main.py --headless --bind 0.0.0.0:8080
+```
+
+Then open `http://<host>:8080` in a browser to access the WebUI.
+
+---
+
+*Original README follows below.*
+
+---
+
 # Twitch Drops Miner
 
 This application allows you to AFK mine timed Twitch drops, without having to worry about switching channels when the one you were watching goes offline, claiming the drops, or even receiving the stream data itself. This helps you save on bandwidth and hassle.
