@@ -23,7 +23,7 @@ class ResponseCache:
         path.parent.mkdir(parents=True, exist_ok=True)
         try:
             self._entries: dict[str, dict[str, Any]] = json_load(path, {}, merge=False)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, OSError):
             # Corrupt cache file – start clean to avoid hard failures.
             self._entries = {}
 

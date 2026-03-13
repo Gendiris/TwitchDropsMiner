@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import json
 from copy import deepcopy
@@ -7,7 +8,9 @@ from datetime import datetime, timezone
 from threading import Lock
 from typing import TYPE_CHECKING, Any, Iterable
 
-from constants import State
+from constants import State, JOURNAL_PATH, CLAIMS_PATH
+
+logger = logging.getLogger("TwitchDrops")
 
 if TYPE_CHECKING:
     from channel import Channel
@@ -24,8 +27,8 @@ class StateStore:
         self._last_watching_login = None
         self._known_claims = set()
         self._first_campaign_load = True
-        self._journal_file = "journal.json"
-        self._claims_file = "claims.json"
+        self._journal_file = JOURNAL_PATH
+        self._claims_file = CLAIMS_PATH
 
         self._game_last_seen: dict[str, datetime] = {}
         self._claims: list[dict[str, Any]] = self._load_claims()
@@ -101,19 +104,19 @@ class StateStore:
             with open(self._claims_file, 'w', encoding='utf-8') as f:
                 json.dump(self._claims, f, ensure_ascii=False, indent=2)
         except Exception:
-            pass
+            logger.warning("Failed to save claims file", exc_info=True)
 
     def _save_journal(self):
         try:
             with open(self._journal_file, 'w', encoding='utf-8') as f:
                 json.dump(self._runtime["journal"], f, ensure_ascii=False, indent=2)
         except Exception:
-            pass
+            logger.warning("Failed to save journal file", exc_info=True)
 
-    def _add_journal_entry(self, type: str, msg: str, icon: str = None, **extra):
+    def _add_journal_entry(self, entry_type: str, msg: str, icon: str = None, **extra):
         entry = {
             "time": self._isoformat(datetime.now(timezone.utc)),
-            "type": type,
+            "type": entry_type,
             "msg": msg,
             "icon": icon,
             **extra,
@@ -251,6 +254,7 @@ class StateStore:
                             if d.is_claimed:
                                 self._known_claims.add(f"claim:{d.id}")
                 except Exception:
+                    logger.warning("Failed to build campaign payload", exc_info=True)
                     continue
 
             self._first_campaign_load = False
@@ -320,11 +324,11 @@ class StateStore:
                     self._runtime["sys_load"] = f"{av[0]:.2f} {av[1]:.2f} {av[2]:.2f}"
                 else:
                     self._runtime["sys_load"] = "Win/NA"
-            except:
+            except Exception:
                 self._runtime["sys_load"] = "-"
 
             snapshot = deepcopy({"settings": self._settings, "runtime": self._runtime})
-            snapshot["runtime"]["claims"] = list(self._claims)
+            snapshot["runtime"]["claims"] = deepcopy(self._claims)
             return snapshot
 
     def clear_journal(self) -> None:

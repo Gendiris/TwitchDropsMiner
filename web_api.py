@@ -56,7 +56,7 @@ class WebAPI:
             token = getattr(settings, "api_token", None)
             if token is not None:
                 auth = request.headers.get("Authorization", "")
-                provided = auth[7:] if auth.startswith("Bearer ") else request.query.get("token", "")
+                provided = auth[7:] if auth.startswith("Bearer ") else ""
                 if provided != token:
                     return web.json_response(
                         {"error": "Unauthorized"},
@@ -120,7 +120,7 @@ class WebAPI:
             return web.json_response({"error": "Payload must be an object"}, status=400)
         updated, errors = _apply_settings(self._service.settings, payload)
         if errors:
-            return web.json_response({"error": errors}, status=400)
+            return web.json_response({"error": "; ".join(errors)}, status=400)
         if updated:
             self._service.settings.save()
             self._service.state_store.update_settings(self._service.settings)
@@ -131,7 +131,10 @@ class WebAPI:
 
     async def _action_reload(self, _: web.Request) -> web.Response:
         try:
-            started = await self._service.reload()
+            started = await asyncio.wait_for(self._service.reload(), timeout=30.0)
+        except asyncio.TimeoutError:
+            logger.error("Reload timed out after 30s")
+            return web.json_response({"error": "Reload timed out"}, status=504)
         except Exception as exc:
             logger.exception("Reload failed")
             return web.json_response({"error": str(exc)}, status=500)
@@ -172,6 +175,9 @@ class WebAPI:
 
         async def _do_restart() -> None:
             await asyncio.sleep(0.5)
+            # NOTE: os.execv only works when running from source.
+            # In a PyInstaller-frozen build, sys.executable points to the bundle
+            # and sys.argv may not produce a valid restart command.
             logger.info("Executing full process restart via os.execv")
             os.execv(sys.executable, [sys.executable] + sys.argv)
 

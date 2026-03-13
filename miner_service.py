@@ -102,6 +102,8 @@ class MinerService:
             self._stop_requested = True
         twitch.close()
         if self._task is not None:
+            # shield() prevents cancellation of the task while we await it,
+            # ensuring the miner shuts down gracefully before we return.
             await asyncio.shield(self._task)
 
     def request_stop(self) -> None:
@@ -179,6 +181,8 @@ class MinerService:
         self._state_store.update_settings(self.settings)
         return self._state_store.get_snapshot()
 
+    MAX_RESTART_ATTEMPTS = 10
+
     async def _supervise(self, client: Twitch) -> int:
         attempt = 0
         while not self._stop_requested:
@@ -186,10 +190,15 @@ class MinerService:
             if self._stop_requested or self._exit_status == 0 or not self._restartable_error:
                 return result
             attempt += 1
+            if attempt > self.MAX_RESTART_ATTEMPTS:
+                msg = f"Max restart attempts ({self.MAX_RESTART_ATTEMPTS}) exceeded, giving up"
+                logger.error(msg)
+                self._state_store.record_error(msg)
+                return result
             backoff_seconds = min(30.0, 2.0**attempt)
             restart_message = (
-                f"Unexpected miner exit detected (attempt {attempt}); restarting in "
-                f"{backoff_seconds:.1f}s"
+                f"Unexpected miner exit detected (attempt {attempt}/{self.MAX_RESTART_ATTEMPTS}); "
+                f"restarting in {backoff_seconds:.1f}s"
             )
             self._state_store.record_restart_attempt(restart_message)
             logger.warning(restart_message)

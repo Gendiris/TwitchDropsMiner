@@ -434,7 +434,7 @@ function buildCampaignCard(c) {
   return div;
 }
 
-function renderCampaigns(runtime, settings) {
+function renderCampaigns(runtime) {
   const container = el('campaignsList');
   if (!container) return;
 
@@ -520,7 +520,7 @@ function renderRuntime(runtime, settings) {
   renderMiningCard(runtime);
   renderSidePanel(runtime);
   renderChannelList(runtime.channels || []);
-  renderCampaigns(runtime, settings);
+  renderCampaigns(runtime);
 }
 
 // ── Uptime + reload timestamp ─────────────────────────────────────────────────
@@ -577,8 +577,8 @@ el('settingsForm')?.addEventListener('submit', async e => {
   const payload = {
     language:             f.get('language'),
     proxy:                f.get('proxy'),
-    priority:             f.get('priority').split(',').map(x => x.trim()).filter(Boolean),
-    exclude:              f.get('exclude').split(',').map(x => x.trim()).filter(Boolean),
+    priority:             (f.get('priority') || '').split(',').map(x => x.trim()).filter(Boolean),
+    exclude:              (f.get('exclude') || '').split(',').map(x => x.trim()).filter(Boolean),
     priority_mode:        f.get('priority_mode'),
     connection_quality:   Number(f.get('connection_quality')),
     available_drops_check: f.get('available_drops_check') === 'on',
@@ -637,25 +637,25 @@ qsa('.chip[data-filter]').forEach(chip => {
     chip.classList.add('active');
     filterMode = chip.dataset.filter;
     updateUrl({ filter: filterMode === 'all' ? null : filterMode });
-    if (lastRuntime) renderCampaigns(lastRuntime, lastSettings);
+    if (lastRuntime) renderCampaigns(lastRuntime);
   });
 });
 
 el('searchInput')?.addEventListener('input', e => {
   filterSearch = e.target.value.toLowerCase();
   updateUrl({ search: filterSearch || null });
-  if (lastRuntime) renderCampaigns(lastRuntime, lastSettings);
+  if (lastRuntime) renderCampaigns(lastRuntime);
 });
 
 el('filterPriorityBtn')?.addEventListener('change', () => {
   updateUrl({ prio: el('filterPriorityBtn').checked ? 'true' : null });
-  if (lastRuntime) renderCampaigns(lastRuntime, lastSettings);
+  if (lastRuntime) renderCampaigns(lastRuntime);
 });
 
 el('sortSelect')?.addEventListener('change', e => {
   sortMode = e.target.value;
   updateUrl({ sort: sortMode === 'last_seen' ? null : sortMode });
-  if (lastRuntime) renderCampaigns(lastRuntime, lastSettings);
+  if (lastRuntime) renderCampaigns(lastRuntime);
 });
 
 // ── Polling ───────────────────────────────────────────────────────────────────
@@ -695,10 +695,35 @@ async function pollSnapshot() {
   }
 }
 
+// ── Page Visibility API ───────────────────────────────────────────────────────
+
+let pollTimer = null;
+let uptimeTimer = null;
+let watchdogTimer = null;
+
+function startPolling() {
+  if (pollTimer) return;
+  pollTimer = setInterval(pollSnapshot, REFRESH_MS);
+  uptimeTimer = setInterval(updateUptime, 1000);
+  watchdogTimer = setInterval(() => { if (currentTab === 'settings') fetchWatchdog(); }, REFRESH_MS);
+  pollSnapshot();
+}
+
+function stopPolling() {
+  clearInterval(pollTimer);   pollTimer = null;
+  clearInterval(uptimeTimer); uptimeTimer = null;
+  clearInterval(watchdogTimer); watchdogTimer = null;
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopPolling();
+  } else {
+    startPolling();
+  }
+});
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 applyUrlParams();
-setInterval(pollSnapshot, REFRESH_MS);
-setInterval(updateUptime, 1000);
-setInterval(() => { if (currentTab === 'settings') fetchWatchdog(); }, REFRESH_MS);
-pollSnapshot();
+startPolling();

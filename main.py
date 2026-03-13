@@ -197,9 +197,17 @@ if __name__ == "__main__":
                 min(service.expected_refresh_interval().total_seconds() / 3, 300.0),
             )
             consecutive_exceedances = 0
+            iteration = 0
             while True:
                 try:
                     await asyncio.sleep(check_interval)
+                    iteration += 1
+                    # Recalculate check_interval every ~10 iterations
+                    if iteration % 10 == 0:
+                        check_interval = max(
+                            60.0,
+                            min(service.expected_refresh_interval().total_seconds() / 3, 300.0),
+                        )
                     snapshot = service.get_snapshot()
                     runtime = snapshot.get("runtime", {})
                     state_name = runtime.get("state")
@@ -241,7 +249,12 @@ if __name__ == "__main__":
                     consecutive_for_log = consecutive_exceedances
                     if should_reload:
                         action = "reload"
-                        asyncio.create_task(service.reload())
+                        reload_task = asyncio.create_task(service.reload())
+                        reload_task.add_done_callback(
+                            lambda t: logger.error(
+                                "Watchdog reload failed: %s", t.exception()
+                            ) if not t.cancelled() and t.exception() else None
+                        )
                         consecutive_exceedances = 0
 
                     diff_minutes = diff.total_seconds() / 60 if diff else None

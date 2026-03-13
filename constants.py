@@ -108,6 +108,8 @@ CACHE_DB = Path(CACHE_PATH, "mapping.json")
 RESPONSES_CACHE = Path(CACHE_PATH, "responses.json")
 COOKIES_PATH = Path(WORKING_DIR, "cookies.jar")
 SETTINGS_PATH = Path(WORKING_DIR, "settings.json")
+JOURNAL_PATH = Path(WORKING_DIR, "journal.json")
+CLAIMS_PATH = Path(WORKING_DIR, "claims.json")
 # Typing
 JsonType = Dict[str, Any]
 URLType = NewType("URLType", str)
@@ -156,6 +158,7 @@ def set_paths(*, working_dir: Path | None = None, settings_path: Path | None = N
     """
     global WORKING_DIR, LANG_PATH, LOG_PATH, DUMP_PATH, LOCK_PATH
     global CACHE_PATH, CACHE_DB, COOKIES_PATH, SETTINGS_PATH
+    global JOURNAL_PATH, CLAIMS_PATH
 
     if working_dir is not None:
         WORKING_DIR = Path(working_dir).resolve()
@@ -167,6 +170,8 @@ def set_paths(*, working_dir: Path | None = None, settings_path: Path | None = N
     CACHE_DB = Path(CACHE_PATH, "mapping.json")
     COOKIES_PATH = Path(WORKING_DIR, "cookies.jar")
     SETTINGS_PATH = Path(settings_path).resolve() if settings_path else Path(WORKING_DIR, "settings.json")
+    JOURNAL_PATH = Path(WORKING_DIR, "journal.json")
+    CLAIMS_PATH = Path(WORKING_DIR, "claims.json")
     LANG_PATH = _resource_path("lang")
 
 
