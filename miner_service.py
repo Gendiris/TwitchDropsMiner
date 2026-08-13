@@ -126,9 +126,6 @@ class MinerService:
             self._reloading = True
             try:
                 was_running = self.is_running
-                twitch = self._twitch
-                if twitch is not None:
-                    twitch.request_stop()
                 await self.stop(manual=False)
                 self._twitch = None
                 self._stop_requested = False
