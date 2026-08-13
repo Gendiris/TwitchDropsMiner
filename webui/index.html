@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Drops Miner</title>
-  <link rel="stylesheet" href="/webui/styles.css?v=20260813">
+  <link rel="stylesheet" href="/webui/styles.css?v=20260813-2">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -53,6 +53,13 @@
 
                 <section class="hero-card card">
                     <div class="hero-main">
+                        <div id="dropProgressRow" class="hero-drop-progress" style="display:none">
+                            <div class="hero-drop-progress-header">
+                                <span id="dropProgressName" class="hero-drop-progress-name"></span>
+                                <span id="dropProgressMinutes" class="hero-drop-progress-minutes"></span>
+                            </div>
+                            <div class="progress-container"><div id="dropProgressBar" class="progress-bar" style="width:0%"></div></div>
+                        </div>
                         <div class="hero-main-row">
                             <div class="status-indicator">
                                 <span class="pulse-dot" id="statusDot"></span>
@@ -221,6 +228,6 @@
         </main>
     </div>
   </div>
-  <script src="/webui/main.js"></script>
+  <script src="/webui/main.js?v=20260813-2"></script>
 </body>
 </html>

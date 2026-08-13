@@ -218,6 +218,8 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .hero-main-row {
@@ -733,6 +735,37 @@ tbody td {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
+}
+
+/* ── Hero drop progress row ───────────────────────────── */
+.hero-drop-progress {
+    width: 100%;
+    min-width: 0;
+    font-size: 0.85rem;
+}
+
+.hero-drop-progress-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 3px;
+}
+
+.hero-drop-progress-name {
+    color: var(--text-main);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.hero-drop-progress-minutes {
+    color: var(--text-muted);
+    font-family: monospace;
+    font-size: 0.8rem;
+    flex-shrink: 0;
 }
 
 /* ── Mobile info-column tabs ──────────────────────────── */

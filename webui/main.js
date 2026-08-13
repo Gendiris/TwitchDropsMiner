@@ -34,6 +34,10 @@ const ui = {
   watchdogList: document.getElementById("watchdogList"),
   connectionStatus: document.getElementById("connectionStatus"),
   lastEventText: document.getElementById("lastEventText"),
+  dropProgressRow: document.getElementById("dropProgressRow"),
+  dropProgressName: document.getElementById("dropProgressName"),
+  dropProgressMinutes: document.getElementById("dropProgressMinutes"),
+  dropProgressBar: document.getElementById("dropProgressBar"),
 };
 
 let startTime = null;
@@ -43,6 +47,8 @@ let filterMode = 'all';
 let filterSearch = '';
 let sortMode = 'priority';
 let navOpen = false;
+let consecutiveFailures = 0;
+let everSucceeded = false;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -175,6 +181,8 @@ function renderRuntime(runtime) {
     }
   }
 
+  renderDropProgress(runtime);
+
   updateReloadTimestamp(runtime.last_reload);
 
   const journal = runtime.journal || [];
@@ -257,6 +265,33 @@ function renderLastEvent(journal) {
   const relTime = formatRelativeTime(entry.time);
   ui.lastEventText.textContent = `${icon} ${entry.msg} — ${relTime}`;
   ui.lastEventText.style.display = 'block';
+}
+
+/** Pick the campaign+drop the hero progress row should track for the watched game. */
+function pickCurrentDrop(runtime) {
+  if (!runtime.watching) return null;
+  const candidates = (runtime.campaigns || []).filter(
+    c => c.game === runtime.watching.game && c.active && c.eligible
+  );
+  if (!candidates.length) return null;
+
+  const campaign = candidates.find(c => (c.drops || []).some(d => !d.claimed && d.current_minutes > 0))
+    || candidates[0];
+  const drop = (campaign.drops || []).find(d => !d.claimed && d.current_minutes < d.required_minutes);
+  return drop ? { drop } : null;
+}
+
+function renderDropProgress(runtime) {
+  if (!ui.dropProgressRow) return;
+  const picked = pickCurrentDrop(runtime);
+  if (!picked) { ui.dropProgressRow.style.display = 'none'; return; }
+
+  const { drop } = picked;
+  const pct = Math.min(100, (drop.current_minutes / drop.required_minutes) * 100 || 0);
+  if (ui.dropProgressName) ui.dropProgressName.textContent = drop.name;
+  if (ui.dropProgressMinutes) ui.dropProgressMinutes.textContent = `${drop.current_minutes}/${drop.required_minutes}m`;
+  if (ui.dropProgressBar) ui.dropProgressBar.style.width = `${pct}%`;
+  ui.dropProgressRow.style.display = 'block';
 }
 
 function getCampaignProgress(c) {
@@ -489,10 +524,23 @@ if (ui.settingsForm) ui.settingsForm.onsubmit = async (e) => {
 
 // ── Polling ────────────────────────────────────────────────────────────────
 
+/** Switch the hero into a plain "can't reach the miner" state — text/color/visibility only. */
+function showOfflineState() {
+  if (ui.statusDot) {
+    ui.statusDot.style.backgroundColor = 'var(--danger)';
+    ui.statusDot.style.boxShadow = '0 0 8px var(--danger)';
+  }
+  if (ui.stateText) ui.stateText.textContent = 'Keine Verbindung';
+  if (ui.watchingText) ui.watchingText.textContent = 'Miner nicht erreichbar — prüfe Netzwerk/Pi';
+  if (ui.dropProgressRow) ui.dropProgressRow.style.display = 'none';
+}
+
 async function pollSnapshot() {
   try {
     const data = await apiCall("/api/snapshot");
     updateConnectionStatus(true);
+    everSucceeded = true;
+    consecutiveFailures = 0;
     if (data.settings && ui.settingsForm && !ui.settingsForm.contains(document.activeElement)) {
       currentPriority = data.settings.priority || [];
       const s = data.settings;
@@ -511,6 +559,9 @@ async function pollSnapshot() {
     if (data.runtime) { lastRuntime = data.runtime; renderRuntime(data.runtime); }
   } catch (err) {
     updateConnectionStatus(false);
+    consecutiveFailures++;
+    // Two failures in a row, or an empty skeleton that never got real data even once.
+    if (consecutiveFailures >= 2 || !everSucceeded) showOfflineState();
   }
 }
 
