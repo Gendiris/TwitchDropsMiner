@@ -122,6 +122,14 @@ If you'd be interested in running the latest master from source or building your
 
 ### Support
 
+If you'd encounter any issues with the miner:
+
+- Please see the [troubleshooting page](https://github.com/DevilXD/TwitchDropsMiner/wiki/Troubleshooting) for some common issues and their explanation.  
+- Please [search the issues page](https://github.com/DevilXD/TwitchDropsMiner/issues?q=sort%3Aupdated-desc%20is%3Aissue) to see if your issue hasn't been reported yet.  
+- If it's not been reported yet, feel free to open a new issue, describing your problem.
+
+If you like the application and found it useful, please consider donating a small amount of money to support me. Thank you!
+
 <div align="center">
 
 [![Buy me a coffee](https://i.imgur.com/cL95gzE.png)](
@@ -195,9 +203,12 @@ placed past the period character at the end.
 @LusTerCsI - For the Traditional Chinese (繁體中文) translation corrections and revisions.  
 @nwvh - For the entirety of the Czech (Čeština) translation.  
 @Kjerne - For the entirety of the Danish (Dansk) translation.  
+@lmdpocus - For the entirety of the Dutch (Nederlandse) translation.  
+@Rensoraa - For the Traditional Dutch (Nederlandse) translation corrections and revisions.  
 @roobini-gamer - For the entirety of the French (Français) translation.  
 @Calvineries - For the French (Français) translation revisions.  
 @ThisIsCyreX - For the entirety of the German (Deutsch) translation.  
+@Nagyhoho1234 - For the entirety of the Hungarian (Magyar) translation.  
 @Eriza-Z - For the entirety of the Indonesian translation.  
 @casungo - For the entirety of the Italian (Italiano) translation.  
 @ShimadaNanaki - For the entirety of the Japanese (日本語) translation.  
@@ -207,9 +218,8 @@ placed past the period character at the end.
 @Sergo1217 - For the entirety of the Russian (Русский) translation.  
 @kilroy98, @flamesv - For the Russian (Русский) translation corrections and revisions.  
 @Shofuu - For the entirety of the Spanish (Español) translation and revisions.  
-@Forero-0 = For the Spanish (Español) translation revisions.  
+@Forero-0 - For the Spanish (Español) translation revisions.  
 @alikdb - For the entirety of the Turkish (Türkçe) translation.  
-@DogancanYr - For the Turkish (Türkçe) translation revisions.  
-@Elderly-Emre - For the Turkish (Türkçe) translation revisions.  
+@DogancanYr, @Elderly-Emre, @Hweord - For the Turkish (Türkçe) translation corrections and revisions.  
 @Nollasko - For the entirety of the Ukrainian (Українська) translation and revisions.  
 @kilroy98 - For the Ukrainian (Українська) translation corrections and revisions.  

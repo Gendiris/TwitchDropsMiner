@@ -139,6 +139,18 @@ class _HeadlessLogin:
         logger.info(f"{status} ({user_id or '-'})")
 
 
+class _HeadlessInvalidateButton:
+    def config(self, *_: Any, **__: Any) -> None:
+        return
+
+
+class _HeadlessHelp:
+    # Upstream toggles gui.help._invalidate_button around auth state changes.
+    def __init__(self, manager: "HeadlessGUI") -> None:
+        self._manager = manager
+        self._invalidate_button = _HeadlessInvalidateButton()
+
+
 class HeadlessGUI:
     def __init__(self, twitch: "Twitch", *, service: "MinerService | None" = None) -> None:
         self._twitch = twitch
@@ -151,6 +163,7 @@ class HeadlessGUI:
         self.progress = _HeadlessProgress(self)
         self.websockets = _HeadlessWebsockets(self)
         self.login = _HeadlessLogin(self)
+        self.help = _HeadlessHelp(self)
         self._handler: logging.Handler | None = None
         if not logging.getLogger("TwitchDrops").handlers:
             handler = logging.StreamHandler(sys.stdout)

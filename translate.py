@@ -197,12 +197,18 @@ class GUIHelpLinks(TypedDict):
     campaigns: str
 
 
+class GUIHelpInvalidate(TypedDict):
+    button: str
+    text: str
+
+
 class GUIHelp(TypedDict):
     links: GUIHelpLinks
     how_it_works: str
     how_it_works_text: str
     getting_started: str
     getting_started_text: str
+    invalidate: GUIHelpInvalidate
 
 
 class GUIMessages(TypedDict):
@@ -264,7 +270,7 @@ default_translation: Translation = {
     "error": {
         "captcha": "Your login attempt was denied by CAPTCHA.\nPlease try again in 12+ hours.",
         "site_down": "Twitch is down, retrying in {seconds} seconds...",
-        "no_connection": "Cannot connect to Twitch, retrying in {seconds} seconds...",
+        "no_connection": "Cannot connect to Twitch, retrying in {seconds} seconds... ({url})",
     },
     "gui": {
         "output": "Output",
@@ -434,6 +440,10 @@ default_translation: Translation = {
                 "the \"Priority mode\", requires you to press on \"Reload\" "
                 "for the changes to take an effect."
             ),
+            "invalidate": {
+                "button": "Invalidate",
+                "text": "Invalidate the authentication token (log out):",
+            },
         },
     },
 }
