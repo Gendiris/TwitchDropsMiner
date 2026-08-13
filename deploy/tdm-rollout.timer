@@ -1,0 +1,11 @@
+[Unit]
+Description=Run TwitchDropsMiner auto-rollout every 30 minutes
+
+[Timer]
+OnCalendar=*:00/30
+RandomizedDelaySec=120
+Persistent=true
+Unit=tdm-rollout.service
+
+[Install]
+WantedBy=timers.target

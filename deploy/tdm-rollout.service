@@ -1,0 +1,17 @@
+[Unit]
+Description=TwitchDropsMiner auto-rollout (fetch, restart, health-check, rollback)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=jan
+WorkingDirectory=/home/jan/TwitchDropsMiner
+# Worst case is two health-check loops (rollout + rollback) at up to
+# 120s each plus git/pip work, roughly 5 minutes -- well past systemd's
+# ~90s default, which would otherwise kill the unit mid `reset --hard`.
+TimeoutStartSec=600
+# Invoked via `bash <path>` rather than executing the file directly, so
+# the script's executable bit doesn't matter (files written from a
+# Windows checkout / git often lose it).
+ExecStart=/bin/bash /home/jan/TwitchDropsMiner/deploy/tdm-rollout.sh
